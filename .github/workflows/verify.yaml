@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-java
+      - uses: eclipse-edc/.github/.github/actions/setup-build@main
       - name: Run Checkstyle
         run: |
           ./gradlew checkstyleMain checkstyleTest
@@ -79,7 +79,7 @@ jobs:
     needs: verify-license-headers
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-java
+      - uses: eclipse-edc/.github/.github/actions/setup-build@main
       - name: Build docker images
         run: ./gradlew dockerize
 
