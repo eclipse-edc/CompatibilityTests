@@ -53,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures.noConstraintPolicy;
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.STARTED;
+import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.SUSPENDED;
 import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
 import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.createDatabase;
 import static org.eclipse.edc.util.io.Ports.getFreePort;
@@ -128,7 +129,9 @@ public class TransferEndToEndTest {
 
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
-    void httpPullTransfer(BaseParticipant consumer, BaseParticipant provider) {
+    void httpPullTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        consumer.setProtocol(protocol);
+        provider.setProtocol(protocol);
         provider.waitForDataPlane();
         providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
         var assetId = UUID.randomUUID().toString();
@@ -161,6 +164,47 @@ public class TransferEndToEndTest {
 
     }
 
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void suspendAndResume_httpPull_dataTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        consumer.setProtocol(protocol);
+        provider.setProtocol(protocol);
+        provider.waitForDataPlane();
+        providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
+        var assetId = UUID.randomUUID().toString();
+        createResourcesOnProvider(provider, assetId, PolicyFixtures.noConstraintPolicy(), httpSourceDataAddress());
+
+        var transferProcessId = consumer.requestAssetFrom(assetId, provider)
+                .withTransferType("HttpData-PULL")
+                .execute();
+
+        consumer.awaitTransferToBeInState(transferProcessId, STARTED);
+
+        var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
+
+        var msg = UUID.randomUUID().toString();
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
+
+        consumer.suspendTransfer(transferProcessId, "supension");
+
+        consumer.awaitTransferToBeInState(transferProcessId, SUSPENDED);
+
+        // checks that the EDR is gone once the transfer has been suspended
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
+        // checks that transfer fails
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
+
+        consumer.resumeTransfer(transferProcessId);
+
+        // check that transfer is available again
+        consumer.awaitTransferToBeInState(transferProcessId, STARTED);
+        var secondEdr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
+        var secondMessage = UUID.randomUUID().toString();
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(secondEdr, Map.of("message", secondMessage), body -> assertThat(body).isEqualTo("data")));
+
+        providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+    }
+
     protected void createResourcesOnProvider(BaseParticipant provider, String assetId, JsonObject contractPolicy, Map<String, Object> dataAddressProperties) {
         provider.createAsset(assetId, Map.of("description", "description"), dataAddressProperties);
         var contractPolicyId = provider.createPolicyDefinition(contractPolicy);
@@ -173,8 +217,10 @@ public class TransferEndToEndTest {
         @Override
         public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
             return Stream.of(
-                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT),
-                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT)
+                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http"),
+                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http"),
+                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http:2024/1"),
+                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http:2024/1")
             );
         }
     }
