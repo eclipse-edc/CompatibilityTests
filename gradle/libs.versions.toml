@@ -2,7 +2,7 @@
 format.version = "1.1"
 
 [versions]
-edc = "0.10.0-SNAPSHOT"
+edc = "0.11.0-SNAPSHOT"
 postgres = "42.7.4"
 jakarta-json = "2.1.3"
 jackson = "2.18.0"
@@ -33,6 +33,7 @@ edc-jsonld = { module = "org.eclipse.edc:json-ld", version.ref = "edc" }
 edc-junit = { module = "org.eclipse.edc:junit", version.ref = "edc" }
 edc-jersey-core = { module = "org.eclipse.edc:jersey-core", version.ref = "edc" }
 edc-jetty-core = { module = "org.eclipse.edc:jetty-core", version.ref = "edc" }
+edc-token-core = { module = "org.eclipse.edc:token-core", version.ref = "edc" }
 
 # Control Plane-specific dependencies
 edc-controlplane-core = { module = "org.eclipse.edc:control-plane-core", version.ref = "edc" }
@@ -111,14 +112,14 @@ testcontainers-postgres = { module = "org.testcontainers:postgresql", version.re
 [bundles]
 dpf = ["edc-dpf-selector-core", "edc-spi-dataplane-selector", "edc-dpf-selector-control-api", "edc-dpf-signaling-client", "edc-dpf-transfer-signaling"]
 
-controlplane = ["edc-controlplane-core", "edc-auth-tokenbased", "edc-auth-configuration", "edc-policy-monitor-core",
+controlplane = ["edc-token-core", "edc-controlplane-core", "edc-auth-tokenbased", "edc-auth-configuration", "edc-policy-monitor-core",
     "edc-api-management", "edc-api-management-config", "edc-api-management-edr", "edc-api-management-dataplaneselector",
     "edc-api-observability", "edc-dsp", "edc-spi-jwt", "edc-http", "edc-controlplane-callback-dispatcher-event",
     "edc-controlplane-callback-dispatcher-http", "edc-identity-core-did", "edc-iam-mock", "edc-identity-trust-transform",
     "edc-api-control-configuration", "edc-lib-transform", "edc-identity-vc-ldp", "edc-did-web", "edc-lib-jws2020", "edc-core-edrstore", "edc-edr-storereceiver"]
 
 dataplane = ["edc-jersey-core", "edc-jetty-core", "edc-dataplane-core", "edc-dataplane-api-control-config", "edc-dataplane-api-control-client", "edc-dataplane-selfregistration",
-    "edc-dataplane-http", "edc-dataplane-http-oauth2", "edc-dataplane-api-public", "edc-dataplane-api-signaling", "edc-dataplane-iam"]
+    "edc-dataplane-http", "edc-dataplane-http-oauth2", "edc-dataplane-api-public", "edc-dataplane-api-signaling", "edc-dataplane-iam", "edc-token-core"]
 
 sql-controlplane = ["edc-sql-assetindex", "edc-sql-contractdef", "edc-sql-contractneg", "edc-sql-policydef",
     "edc-sql-edrcache", "edc-sql-transferprocess", "edc-sql-dataplane-instancestore", "edc-sql-core", "edc-sql-lease", "edc-sql-policymonitor",

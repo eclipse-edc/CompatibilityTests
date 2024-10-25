@@ -2,7 +2,7 @@
 format.version = "1.1"
 
 [versions]
-edc = "0.9.1"
+edc = "0.10.0"
 postgres = "42.7.4"
 
 # add here
@@ -31,6 +31,7 @@ edc-junit = { module = "org.eclipse.edc:junit", version.ref = "edc" }
 edc-jersey-core = { module = "org.eclipse.edc:jersey-core", version.ref = "edc" }
 edc-jetty-core = { module = "org.eclipse.edc:jetty-core", version.ref = "edc" }
 edc-configuration-filesystem = { module = "org.eclipse.edc:configuration-filesystem", version.ref = "edc" }
+edc-token-core = { module = "org.eclipse.edc:token-core", version.ref = "edc" }
 
 # Control Plane-specific dependencies
 edc-controlplane-core = { module = "org.eclipse.edc:control-plane-core", version.ref = "edc" }
@@ -105,10 +106,11 @@ controlplane = ["edc-configuration-filesystem", "edc-controlplane-core", "edc-au
     "edc-api-management", "edc-api-management-config", "edc-api-management-edr", "edc-api-management-dataplaneselector",
     "edc-api-observability", "edc-dsp", "edc-spi-jwt", "edc-http", "edc-controlplane-callback-dispatcher-event",
     "edc-controlplane-callback-dispatcher-http", "edc-identity-core-did", "edc-iam-mock", "edc-identity-trust-transform",
-    "edc-api-control-configuration", "edc-lib-transform", "edc-identity-vc-ldp", "edc-did-web", "edc-lib-jws2020", "edc-core-edrstore", "edc-edr-storereceiver"]
+    "edc-api-control-configuration", "edc-lib-transform", "edc-identity-vc-ldp", "edc-did-web", "edc-lib-jws2020", "edc-core-edrstore",
+    "edc-edr-storereceiver", "edc-token-core"]
 
 dataplane = ["edc-configuration-filesystem", "edc-jersey-core", "edc-jetty-core", "edc-dataplane-core", "edc-dataplane-api-control-config", "edc-dataplane-api-control-client", "edc-dataplane-selfregistration",
-    "edc-dataplane-http", "edc-dataplane-http-oauth2", "edc-dataplane-api-public", "edc-dataplane-api-signaling", "edc-dataplane-iam"]
+    "edc-dataplane-http", "edc-dataplane-http-oauth2", "edc-dataplane-api-public", "edc-dataplane-api-signaling", "edc-dataplane-iam", "edc-token-core"]
 
 sql-controlplane = ["edc-sql-assetindex", "edc-sql-contractdef", "edc-sql-contractneg", "edc-sql-policydef",
     "edc-sql-edrcache", "edc-sql-transferprocess", "edc-sql-dataplane-instancestore", "edc-sql-core", "edc-sql-lease", "edc-sql-policymonitor",
