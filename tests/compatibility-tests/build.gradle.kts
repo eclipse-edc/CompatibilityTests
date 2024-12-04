@@ -27,5 +27,5 @@ dependencies {
     testImplementation(libs.testcontainers.junit)
     testImplementation(libs.testcontainers.postgres)
     testImplementation(testFixtures(libs.edc.api.management.test.fixtures))
-    testImplementation(testFixtures(libs.edc.sql.core))
+    testImplementation(testFixtures(libs.edc.sql.test.fixtures))
 }

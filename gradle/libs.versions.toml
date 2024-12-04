@@ -95,6 +95,7 @@ edc-sql-transactionlocal = { module = "org.eclipse.edc:transaction-local", versi
 edc-sql-accesstokendata = { module = "org.eclipse.edc:accesstokendata-store-sql", version.ref = "edc" }
 edc-sql-dataplane = { module = "org.eclipse.edc:data-plane-store-sql", version.ref = "edc" }
 edc-sql-dataplane-instancestore = { module = "org.eclipse.edc:data-plane-instance-store-sql", version.ref = "edc" }
+edc-sql-test-fixtures = { module = "org.eclipse.edc:sql-test-fixtures", version.ref = "edc" }
 
 # Third-part dependencies
 postgres = { module = "org.postgresql:postgresql", version.ref = "postgres" }
