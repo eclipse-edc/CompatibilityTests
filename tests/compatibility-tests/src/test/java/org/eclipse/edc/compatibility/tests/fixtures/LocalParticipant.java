@@ -14,7 +14,6 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -35,15 +34,15 @@ public class LocalParticipant extends BaseParticipant {
                 put("edc.api.auth.key", API_KEY);
                 put("web.http.port", String.valueOf(controlPlaneDefault.getPort()));
                 put("web.http.path", "/api");
-                put("web.http.protocol.port", String.valueOf(protocolEndpoint.getUrl().getPort()));
-                put("web.http.protocol.path", protocolEndpoint.getUrl().getPath());
-                put("web.http.management.port", String.valueOf(managementEndpoint.getUrl().getPort()));
-                put("web.http.management.path", managementEndpoint.getUrl().getPath());
+                put("web.http.protocol.port", String.valueOf(controlPlaneProtocol.get().getPort()));
+                put("web.http.protocol.path", controlPlaneProtocol.get().getPath());
+                put("web.http.management.port", String.valueOf(controlPlaneManagement.get().getPort()));
+                put("web.http.management.path", controlPlaneManagement.get().getPath());
                 put("web.http.version.port", String.valueOf(controlPlaneVersion.getPort()));
                 put("web.http.version.path", controlPlaneVersion.getPath());
                 put("web.http.control.port", String.valueOf(controlPlaneControl.getPort()));
                 put("web.http.control.path", controlPlaneControl.getPath());
-                put("edc.dsp.callback.address", protocolEndpoint.getUrl().toString());
+                put("edc.dsp.callback.address", controlPlaneProtocol.get().toString());
                 put("edc.transfer.proxy.endpoint", dataPlanePublic.toString());
                 put("edc.transfer.send.retry.limit", "1");
                 put("edc.transfer.send.retry.base-delay.ms", "100");
@@ -110,10 +109,9 @@ public class LocalParticipant extends BaseParticipant {
 
         @Override
         public LocalParticipant build() {
-            var headers = Map.of("x-api-key", API_KEY);
-            super.managementEndpoint(new Endpoint(URI.create("http://localhost:" + getFreePort() + "/api/management"), headers));
-            super.protocolEndpoint(new Endpoint(URI.create("http://localhost:" + getFreePort() + "/protocol")));
             super.build();
+            var headers = Map.of("x-api-key", API_KEY);
+            participant.enrichManagementRequest = req -> req.headers(headers);
             return participant;
         }
     }

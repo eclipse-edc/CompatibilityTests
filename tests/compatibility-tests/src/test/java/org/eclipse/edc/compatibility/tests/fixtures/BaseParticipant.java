@@ -77,7 +77,7 @@ public abstract class BaseParticipant extends Participant {
     public void waitForDataPlane() {
         await().atMost(timeout)
                 .untilAsserted(() -> {
-                    var jp = managementEndpoint.baseRequest()
+                    var jp = baseManagementRequest()
                             .get("/v3/dataplanes")
                             .then()
                             .statusCode(200)
@@ -97,7 +97,7 @@ public abstract class BaseParticipant extends Participant {
      * @return The cached {@link DataAddress}
      */
     public DataAddress getEdr(String transferProcessId) {
-        var dataAddressRaw = managementEndpoint.baseRequest()
+        var dataAddressRaw = baseManagementRequest()
                 .contentType(JSON)
                 .when()
                 .get("/v3/edrs/{id}/dataaddress", transferProcessId)
@@ -127,6 +127,6 @@ public abstract class BaseParticipant extends Participant {
         protected Builder(P participant) {
             super(participant);
         }
-        
+
     }
 }
