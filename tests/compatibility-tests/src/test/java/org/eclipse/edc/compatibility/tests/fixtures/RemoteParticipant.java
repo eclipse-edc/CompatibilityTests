@@ -14,11 +14,8 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.eclipse.edc.util.io.Ports.getFreePort;
 
 public class RemoteParticipant extends BaseParticipant {
 
@@ -31,15 +28,15 @@ public class RemoteParticipant extends BaseParticipant {
                 put("EDC_API_AUTH_KEY", API_KEY);
                 put("WEB_HTTP_PORT", String.valueOf(controlPlaneDefault.getPort()));
                 put("WEB_HTTP_PATH", "/api");
-                put("WEB_HTTP_PROTOCOL_PORT", String.valueOf(protocolEndpoint.getUrl().getPort()));
-                put("WEB_HTTP_PROTOCOL_PATH", protocolEndpoint.getUrl().getPath());
-                put("WEB_HTTP_MANAGEMENT_PORT", String.valueOf(managementEndpoint.getUrl().getPort()));
-                put("WEB_HTTP_MANAGEMENT_PATH", managementEndpoint.getUrl().getPath());
+                put("WEB_HTTP_PROTOCOL_PORT", String.valueOf(controlPlaneProtocol.get().getPort()));
+                put("WEB_HTTP_PROTOCOL_PATH", controlPlaneProtocol.get().getPath());
+                put("WEB_HTTP_MANAGEMENT_PORT", String.valueOf(controlPlaneManagement.get().getPort()));
+                put("WEB_HTTP_MANAGEMENT_PATH", controlPlaneManagement.get().getPath());
                 put("WEB_HTTP_VERSION_PORT", String.valueOf(controlPlaneVersion.getPort()));
                 put("WEB_HTTP_VERSION_PATH", controlPlaneVersion.getPath());
                 put("WEB_HTTP_CONTROL_PORT", String.valueOf(controlPlaneControl.getPort()));
                 put("WEB_HTTP_CONTROL_PATH", controlPlaneControl.getPath());
-                put("EDC_DSP_CALLBACK_ADDRESS", protocolEndpoint.getUrl().toString());
+                put("EDC_DSP_CALLBACK_ADDRESS", controlPlaneProtocol.get().toString());
                 put("EDC_DATASOURCE_DEFAULT_URL", "jdbc:postgresql://localhost:5432/%s".formatted(getId()));
                 put("EDC_DATASOURCE_DEFAULT_USER", "postgres");
                 put("EDC_DATASOURCE_DEFAULT_PASSWORD", "password");
@@ -85,13 +82,12 @@ public class RemoteParticipant extends BaseParticipant {
         public static Builder newInstance() {
             return new Builder();
         }
-        
+
         @Override
         public RemoteParticipant build() {
-            var headers = Map.of("x-api-key", API_KEY);
-            super.managementEndpoint(new Endpoint(URI.create("http://localhost:" + getFreePort() + "/api/management"), headers));
-            super.protocolEndpoint(new Endpoint(URI.create("http://localhost:" + getFreePort() + "/protocol")));
             super.build();
+            var headers = Map.of("x-api-key", API_KEY);
+            participant.enrichManagementRequest = req -> req.headers(headers);
             return participant;
         }
     }
