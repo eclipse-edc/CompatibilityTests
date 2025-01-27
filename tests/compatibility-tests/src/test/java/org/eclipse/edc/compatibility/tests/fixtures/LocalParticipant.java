@@ -31,13 +31,14 @@ public class LocalParticipant extends BaseParticipant {
         return new HashMap<>() {
             {
                 put(PARTICIPANT_ID, id);
-                put("edc.api.auth.key", API_KEY);
                 put("web.http.port", String.valueOf(controlPlaneDefault.getPort()));
                 put("web.http.path", "/api");
                 put("web.http.protocol.port", String.valueOf(controlPlaneProtocol.get().getPort()));
                 put("web.http.protocol.path", controlPlaneProtocol.get().getPath());
                 put("web.http.management.port", String.valueOf(controlPlaneManagement.get().getPort()));
                 put("web.http.management.path", controlPlaneManagement.get().getPath());
+                put("web.http.management.auth.type", "tokenbased");
+                put("web.http.management.auth.key", API_KEY);
                 put("web.http.version.port", String.valueOf(controlPlaneVersion.getPort()));
                 put("web.http.version.path", controlPlaneVersion.getPath());
                 put("web.http.control.port", String.valueOf(controlPlaneControl.getPort()));
