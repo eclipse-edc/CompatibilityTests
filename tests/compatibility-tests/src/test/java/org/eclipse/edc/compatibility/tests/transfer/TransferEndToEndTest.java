@@ -70,7 +70,6 @@ class TransferEndToEndTest extends AbstractTest {
         // Do the transfer
         var msg = UUID.randomUUID().toString();
         await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
-
         // checks that the EDR is gone once the contract expires
         await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
 
