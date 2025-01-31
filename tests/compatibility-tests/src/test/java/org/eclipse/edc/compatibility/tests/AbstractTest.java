@@ -1,5 +1,16 @@
 package org.eclipse.edc.compatibility.tests;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+
+import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
+import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.createDatabase;
+import static org.eclipse.edc.util.io.Ports.getFreePort;
+import static org.mockserver.integration.ClientAndServer.startClientAndServer;
+
 import org.eclipse.edc.compatibility.tests.fixtures.BaseParticipant;
 import org.eclipse.edc.compatibility.tests.fixtures.EdcDockerRuntimes;
 import org.eclipse.edc.compatibility.tests.fixtures.LocalParticipant;
@@ -22,17 +33,6 @@ import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 import org.testcontainers.containers.PostgreSQLContainer;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
-
-import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
-import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.createDatabase;
-import static org.eclipse.edc.util.io.Ports.getFreePort;
-import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 public abstract class AbstractTest {
     private static final List<String> PROTOCOLS_TO_TEST = List.of("dataspace-protocol-http", "dataspace-protocol-http:2024/1");
