@@ -65,10 +65,8 @@ class TransferEndToEndTest extends AbstractTest {
         initialise(consumer, provider, protocol);
         var assetId = provider.createResource(createDataAddress(providerDataSource, "/source"), PolicyFixtures.contractExpiresIn("5s"));
         var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
-
         consumer.awaitTransferToBeInState(transferProcessId, STARTED);
         var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
-
         // Do the transfer
         var msg = UUID.randomUUID().toString();
         await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
