@@ -14,11 +14,11 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
-import java.net.URL;
-import java.util.Map;
-
 import org.eclipse.edc.junit.extensions.ClasspathReader;
 import org.eclipse.edc.junit.extensions.EmbeddedRuntime;
+
+import java.net.URL;
+import java.util.Map;
 
 public enum Runtimes {
 

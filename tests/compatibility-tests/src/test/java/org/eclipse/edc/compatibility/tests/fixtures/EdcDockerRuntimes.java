@@ -14,11 +14,11 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
-import java.util.Map;
-
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.yaml.snakeyaml.util.Tuple;
+
+import java.util.Map;
 
 public enum EdcDockerRuntimes {
     STABLE_CONNECTOR_0_10_0("controlplane-010:latest", "dataplane-010:latest"),

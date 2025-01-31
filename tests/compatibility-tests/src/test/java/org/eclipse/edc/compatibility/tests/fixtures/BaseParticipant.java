@@ -14,6 +14,16 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
+import io.restassured.common.mapper.TypeRef;
+import io.restassured.http.ContentType;
+import jakarta.json.Json;
+import jakarta.json.JsonObject;
+import jakarta.json.JsonObjectBuilder;
+import org.assertj.core.api.ThrowingConsumer;
+import org.eclipse.edc.connector.controlplane.test.system.utils.Participant;
+import org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates;
+import org.eclipse.edc.spi.types.domain.DataAddress;
+
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
@@ -25,16 +35,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.eclipse.edc.junit.testfixtures.TestUtils.getResourceFileContentAsString;
 import static org.eclipse.edc.util.io.Ports.getFreePort;
-
-import io.restassured.common.mapper.TypeRef;
-import io.restassured.http.ContentType;
-import jakarta.json.Json;
-import jakarta.json.JsonObject;
-import jakarta.json.JsonObjectBuilder;
-import org.assertj.core.api.ThrowingConsumer;
-import org.eclipse.edc.connector.controlplane.test.system.utils.Participant;
-import org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates;
-import org.eclipse.edc.spi.types.domain.DataAddress;
 
 public abstract class BaseParticipant extends Participant {
 
