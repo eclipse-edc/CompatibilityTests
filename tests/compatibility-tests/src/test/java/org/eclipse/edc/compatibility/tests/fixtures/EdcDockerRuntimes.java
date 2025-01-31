@@ -16,30 +16,29 @@ package org.eclipse.edc.compatibility.tests.fixtures;
 
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.yaml.snakeyaml.util.Tuple;
 
 import java.util.Map;
 
 public enum EdcDockerRuntimes {
+    STABLE_CONNECTOR_0_10_0("controlplane-010:latest", "dataplane-010:latest"),
 
-    CONTROL_PLANE(
-            "controlplane-stable:latest"
-    ),
+    STABLE_CONNECTOR("controlplane-stable:latest", "dataplane-stable:latest");
 
-    DATA_PLANE(
-            "dataplane-stable:latest"
-    );
+    private final String controlPlaneImage;
+    private final String dataPlaneImage;
 
-    private final String image;
-
-    EdcDockerRuntimes(String image) {
-        this.image = image;
+    EdcDockerRuntimes(String controlPlaneImage, String dataPlaneImage) {
+        this.controlPlaneImage = controlPlaneImage;
+        this.dataPlaneImage = dataPlaneImage;
     }
 
-    public GenericContainer<?> create(String name, Map<String, String> env) {
-        return new GenericContainer<>(image)
-                .withCreateContainerCmdModifier(cmd -> cmd.withName(name))
-                .withNetworkMode("host")
-                .waitingFor(Wait.forLogMessage(".*Runtime .* ready.*", 1))
-                .withEnv(env);
+    public Tuple<GenericContainer<?>, GenericContainer<?>> start(Map<String, String> controlPlaneEnv, Map<String, String> dataPlaneEnv) {
+        var controlPlane =
+                new GenericContainer<>(controlPlaneImage).withCreateContainerCmdModifier(cmd -> cmd.withName(this.name() + "-controlplane")).withNetworkMode("host").waitingFor(Wait.forLogMessage(".*Runtime .* ready.*", 1)).withEnv(controlPlaneEnv);
+        var dataPlane = new GenericContainer<>(dataPlaneImage).withCreateContainerCmdModifier(cmd -> cmd.withName(this.name() + "-dataplane")).withNetworkMode("host").waitingFor(Wait.forLogMessage(".*Runtime .* ready.*", 1)).withEnv(dataPlaneEnv);
+        controlPlane.start();
+        dataPlane.start();
+        return new Tuple<>(controlPlane, dataPlane);
     }
 }

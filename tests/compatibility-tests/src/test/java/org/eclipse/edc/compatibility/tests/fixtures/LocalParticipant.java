@@ -19,26 +19,24 @@ import java.util.Map;
 
 import static org.eclipse.edc.boot.BootServicesExtension.PARTICIPANT_ID;
 import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.defaultDatasourceConfiguration;
-import static org.eclipse.edc.util.io.Ports.getFreePort;
 
 public class LocalParticipant extends BaseParticipant {
 
     private static final String API_KEY = "password";
 
-    private final int httpProvisionerPort = getFreePort();
-
     public Map<String, String> controlPlaneConfiguration() {
         return new HashMap<>() {
             {
                 put(PARTICIPANT_ID, id);
+                put("web.http.management.auth.key", API_KEY);
+                put("web.http.management.auth.type", "tokenbased");
+                put("web.http.management.auth.context", "management-api");
                 put("web.http.port", String.valueOf(controlPlaneDefault.getPort()));
                 put("web.http.path", "/api");
                 put("web.http.protocol.port", String.valueOf(controlPlaneProtocol.get().getPort()));
                 put("web.http.protocol.path", controlPlaneProtocol.get().getPath());
                 put("web.http.management.port", String.valueOf(controlPlaneManagement.get().getPort()));
                 put("web.http.management.path", controlPlaneManagement.get().getPath());
-                put("web.http.management.auth.type", "tokenbased");
-                put("web.http.management.auth.key", API_KEY);
                 put("web.http.version.port", String.valueOf(controlPlaneVersion.getPort()));
                 put("web.http.version.path", controlPlaneVersion.getPath());
                 put("web.http.control.port", String.valueOf(controlPlaneControl.getPort()));
