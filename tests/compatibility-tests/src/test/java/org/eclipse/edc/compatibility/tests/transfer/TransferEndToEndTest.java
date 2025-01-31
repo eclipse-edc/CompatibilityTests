@@ -67,7 +67,6 @@ class TransferEndToEndTest extends AbstractTest {
         var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
 
         consumer.awaitTransferToBeInState(transferProcessId, STARTED);
-
         var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
 
         // Do the transfer
