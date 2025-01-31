@@ -14,21 +14,17 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
-import org.eclipse.edc.junit.extensions.ClasspathReader;
-import org.eclipse.edc.junit.extensions.EmbeddedRuntime;
-
 import java.net.URL;
 import java.util.Map;
 
+import org.eclipse.edc.junit.extensions.ClasspathReader;
+import org.eclipse.edc.junit.extensions.EmbeddedRuntime;
+
 public enum Runtimes {
 
-    CONTROL_PLANE(
-            ":runtimes:snapshot:controlplane-snapshot"
-    ),
+    CONTROL_PLANE(":runtimes:snapshot:controlplane-snapshot"),
 
-    DATA_PLANE(
-            ":runtimes:snapshot:dataplane-snapshot"
-    );
+    DATA_PLANE(":runtimes:snapshot:dataplane-snapshot");
 
     private final String[] modules;
     private URL[] classpathEntries;

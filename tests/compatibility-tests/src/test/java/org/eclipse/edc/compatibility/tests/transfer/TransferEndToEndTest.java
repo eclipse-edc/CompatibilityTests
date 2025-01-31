@@ -14,151 +14,67 @@
 
 package org.eclipse.edc.compatibility.tests.transfer;
 
-import jakarta.json.JsonObject;
-import org.eclipse.edc.compatibility.tests.fixtures.BaseParticipant;
-import org.eclipse.edc.compatibility.tests.fixtures.EdcDockerRuntimes;
-import org.eclipse.edc.compatibility.tests.fixtures.LocalParticipant;
-import org.eclipse.edc.compatibility.tests.fixtures.RemoteParticipant;
-import org.eclipse.edc.compatibility.tests.fixtures.Runtimes;
-import org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures;
-import org.eclipse.edc.junit.annotations.EndToEndTest;
-import org.eclipse.edc.junit.extensions.RuntimeExtension;
-import org.eclipse.edc.junit.extensions.RuntimePerClassExtension;
-import org.eclipse.edc.spi.security.Vault;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.extension.BeforeAllCallback;
-import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.RegisterExtension;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.ArgumentsProvider;
-import org.junit.jupiter.params.provider.ArgumentsSource;
-import org.mockserver.integration.ClientAndServer;
-import org.mockserver.model.HttpRequest;
-import org.mockserver.model.HttpResponse;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
-
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
-import static org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures.noConstraintPolicy;
+import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.DEPROVISIONED;
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.STARTED;
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.SUSPENDED;
+import static org.eclipse.edc.jsonld.spi.JsonLdKeywords.TYPE;
 import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
-import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.createDatabase;
 import static org.eclipse.edc.util.io.Ports.getFreePort;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
+import static org.mockserver.model.HttpRequest.request;
+import static org.mockserver.model.HttpResponse.response;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpMethod;
+import jakarta.json.Json;
+import jakarta.json.JsonArrayBuilder;
+import jakarta.json.JsonObject;
+import org.eclipse.edc.compatibility.tests.AbstractTest;
+import org.eclipse.edc.compatibility.tests.fixtures.BaseParticipant;
+import org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures;
+import org.eclipse.edc.connector.controlplane.transfer.spi.event.TransferProcessStarted;
+import org.eclipse.edc.junit.annotations.EndToEndTest;
+import org.eclipse.edc.spi.event.EventEnvelope;
+import org.eclipse.edc.spi.types.domain.DataAddress;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.model.HttpResponse;
+import org.mockserver.model.HttpStatusCode;
+import org.mockserver.model.MediaType;
 
 @EndToEndTest
-public class TransferEndToEndTest {
-
-    protected static final LocalParticipant LOCAL_PARTICIPANT = LocalParticipant.Builder.newInstance()
-            .name("local")
-            .id("local")
-            .build();
-
-    protected static final RemoteParticipant REMOTE_PARTICIPANT = RemoteParticipant.Builder.newInstance()
-            .name("remote")
-            .id("remote")
-            .build();
-
-    @Order(1)
-    @RegisterExtension
-    static final RuntimeExtension LOCAL_CONTROL_PLANE = new RuntimePerClassExtension(
-            Runtimes.CONTROL_PLANE.create("local-control-plane", LOCAL_PARTICIPANT.controlPlanePostgresConfiguration()));
-
-    @Order(2)
-    @RegisterExtension
-    static final RuntimeExtension LOCAL_DATA_PLANE = new RuntimePerClassExtension(
-            Runtimes.DATA_PLANE.create("local-data-plane", LOCAL_PARTICIPANT.dataPlanePostgresConfiguration()));
-
-
-    private static final GenericContainer<?> CONTROL_PLANE = EdcDockerRuntimes.CONTROL_PLANE.create("controlplane", REMOTE_PARTICIPANT.controlPlaneEnv());
-
-    private static final GenericContainer<?> DATA_PLANE = EdcDockerRuntimes.DATA_PLANE.create("dataplane", REMOTE_PARTICIPANT.dataPlaneEnv());
-
-    private static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:16.4")
-            .withUsername("postgres")
-            .withPassword("password")
-            .withCreateContainerCmdModifier(cmd -> cmd.withName("postgres"));
-
-    @Order(0)
-    @RegisterExtension
-    static final BeforeAllCallback CREATE_DATABASES = context -> {
-        PG.setPortBindings(List.of("5432:5432"));
-        PG.start();
-        createDatabase(LOCAL_PARTICIPANT.getName());
-        createDatabase(REMOTE_PARTICIPANT.getName());
-    };
-
-    private static ClientAndServer providerDataSource;
-
-    @BeforeAll
-    static void beforeAll() {
-        CONTROL_PLANE.start();
-        DATA_PLANE.start();
-        providerDataSource = startClientAndServer(getFreePort());
-    }
-
-    private static @NotNull Map<String, Object> httpSourceDataAddress() {
-        return Map.of(
-                EDC_NAMESPACE + "name", "transfer-test",
-                EDC_NAMESPACE + "baseUrl", "http://localhost:" + providerDataSource.getPort() + "/source",
-                EDC_NAMESPACE + "type", "HttpData",
-                EDC_NAMESPACE + "proxyQueryParams", "true"
-        );
-    }
-
-    @BeforeEach
-    void storeKeys() {
-        var vault = LOCAL_DATA_PLANE.getService(Vault.class);
-        vault.storeSecret("private-key", LOCAL_PARTICIPANT.getPrivateKey());
-        vault.storeSecret("public-key", LOCAL_PARTICIPANT.getPublicKey());
-    }
+class TransferEndToEndTest extends AbstractTest {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
-    void httpPullTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
-        consumer.setProtocol(protocol);
-        provider.setProtocol(protocol);
-        provider.waitForDataPlane();
-        providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
-        var assetId = UUID.randomUUID().toString();
-        var sourceDataAddress = httpSourceDataAddress();
-        createResourcesOnProvider(provider, assetId, PolicyFixtures.contractExpiresIn("5s"), sourceDataAddress);
-
-        var transferProcessId = consumer.requestAssetFrom(assetId, provider)
-                .withTransferType("HttpData-PULL")
-                .execute();
-
+    void httpPullTransferWithExpiry(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        initialise(consumer, provider, protocol);
+        var assetId = provider.createResource(createDataAddress(providerDataSource, "/source"), PolicyFixtures.contractExpiresIn("5s"));
+        var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
         consumer.awaitTransferToBeInState(transferProcessId, STARTED);
-
-        var edr = await().atMost(consumer.getTimeout())
-                .until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
-
+        var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
         // Do the transfer
         var msg = UUID.randomUUID().toString();
-        await().atMost(consumer.getTimeout())
-                .untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
-
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
         // checks that the EDR is gone once the contract expires
-        await().atMost(consumer.getTimeout())
-                .untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
 
         // checks that transfer fails
-        await().atMost(consumer.getTimeout())
-                .untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
 
         providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
 
@@ -167,16 +83,11 @@ public class TransferEndToEndTest {
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
     void suspendAndResume_httpPull_dataTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
-        consumer.setProtocol(protocol);
-        provider.setProtocol(protocol);
-        provider.waitForDataPlane();
-        providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
-        var assetId = UUID.randomUUID().toString();
-        createResourcesOnProvider(provider, assetId, PolicyFixtures.noConstraintPolicy(), httpSourceDataAddress());
+        initialise(consumer, provider, protocol);
+        Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
+        var assetId = provider.createResource(dataAddress, PolicyFixtures.noConstraintPolicy());
 
-        var transferProcessId = consumer.requestAssetFrom(assetId, provider)
-                .withTransferType("HttpData-PULL")
-                .execute();
+        var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
 
         consumer.awaitTransferToBeInState(transferProcessId, STARTED);
 
@@ -205,24 +116,111 @@ public class TransferEndToEndTest {
         providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
     }
 
-    protected void createResourcesOnProvider(BaseParticipant provider, String assetId, JsonObject contractPolicy, Map<String, Object> dataAddressProperties) {
-        provider.createAsset(assetId, Map.of("description", "description"), dataAddressProperties);
-        var contractPolicyId = provider.createPolicyDefinition(contractPolicy);
-        var noConstraintPolicyId = provider.createPolicyDefinition(noConstraintPolicy());
-
-        provider.createContractDefinition(assetId, UUID.randomUUID().toString(), noConstraintPolicyId, contractPolicyId);
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void suspendAndResumeByProvider_httpPull_dataTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        initialise(consumer, provider, protocol);
+        Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
+        var assetId = provider.createResource(dataAddress, PolicyFixtures.noConstraintPolicy());
+        var consumerTransferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
+        consumer.awaitTransferToBeInState(consumerTransferProcessId, STARTED);
+        var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(consumerTransferProcessId), Objects::nonNull);
+        var msg = UUID.randomUUID().toString();
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
+        var providerTransferProcessId =
+                provider.getTransferProcesses().stream().filter(filter -> filter.asJsonObject().getString("correlationId").equals(consumerTransferProcessId)).map(id -> id.asJsonObject().getString("@id")).findFirst().orElseThrow();
+        provider.suspendTransfer(providerTransferProcessId, "suspension");
+        provider.awaitTransferToBeInState(providerTransferProcessId, SUSPENDED);
+        // checks that the EDR is gone once the transfer has been suspended
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(consumerTransferProcessId)));
+        // checks that transfer fails
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
+        provider.resumeTransfer(providerTransferProcessId);
+        // check that transfer is available again
+        provider.awaitTransferToBeInState(providerTransferProcessId, STARTED);
+        var secondEdr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(consumerTransferProcessId), Objects::nonNull);
+        var secondMessage = UUID.randomUUID().toString();
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(secondEdr, Map.of("message", secondMessage), body -> assertThat(body).isEqualTo("data")));
+        providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
     }
 
-    private static class ParticipantsArgProvider implements ArgumentsProvider {
-        @Override
-        public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
-            return Stream.of(
-                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http"),
-                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http"),
-                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http:2024/1"),
-                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http:2024/1")
-            );
+
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void terminateTransferProcess(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        initialise(consumer, provider, protocol);
+        Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
+        var assetId = provider.createResource(dataAddress, PolicyFixtures.noConstraintPolicy());
+        String transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
+        consumer.awaitTransferToBeInState(transferProcessId, STARTED);
+        DataAddress edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of(), body -> assertThat(body).isEqualTo("data")));
+        var providerTransferProcessId = provider.getTransferProcesses().stream().filter(filter -> filter.asJsonObject().getString("correlationId").equals(transferProcessId)).map(id -> id.asJsonObject().getString("@id")).findFirst().orElseThrow();
+        provider.terminateTransfer(providerTransferProcessId);
+        provider.awaitTransferToBeInState(providerTransferProcessId, DEPROVISIONED);
+        // checks that the EDR is gone once the transfer has been terminated
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of(), body -> assertThat(body).isEqualTo("data"))));
+        providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+    }
+
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void deprovisionShouldFailOnceTransferProcessHasStarted(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        initialise(consumer, provider, protocol);
+        Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
+        var assetId = provider.createResource(dataAddress, PolicyFixtures.noConstraintPolicy());
+        String transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
+        consumer.awaitTransferToBeInState(transferProcessId, STARTED);
+        assertThatThrownBy(() -> consumer.deprovisionTransfer(transferProcessId)).hasMessageContaining("Expected status code <204> but was <409>");
+        DataAddress edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of(), body -> assertThat(body).isEqualTo("data")));
+        providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+    }
+
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void httpPull_dataTransfer_withCallbacks(BaseParticipant consumer, BaseParticipant provider, String protocol) {
+        initialise(consumer, provider, protocol);
+        Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
+        var callbacksEndpoint = startClientAndServer(getFreePort());
+        var assetId = provider.createResource(dataAddress, PolicyFixtures.noConstraintPolicy());
+        var callbackUrl = String.format("http://localhost:%d/hooks", callbacksEndpoint.getLocalPort());
+        var callbacks = Json.createArrayBuilder().add(createCallback(callbackUrl, true, Set.of("transfer.process.started"))).build();
+
+        var request = request().withPath("/hooks").withMethod(HttpMethod.POST.name());
+
+        var events = new ConcurrentHashMap<String, TransferProcessStarted>();
+
+        callbacksEndpoint.when(request).respond(req -> this.cacheEdr(req, events));
+
+        var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").withCallbacks(callbacks).execute();
+
+        consumer.awaitTransferToBeInState(transferProcessId, STARTED);
+
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThat(events.get(transferProcessId)).isNotNull());
+        var event = events.get(transferProcessId);
+        var msg = UUID.randomUUID().toString();
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(event.getDataAddress(), Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
+
+        providerDataSource.verify(request("/source").withMethod("GET"));
+    }
+
+    private JsonObject createCallback(String url, boolean transactional, Set<String> events) {
+        return Json.createObjectBuilder().add(TYPE, EDC_NAMESPACE + "CallbackAddress").add(EDC_NAMESPACE + "transactional", transactional).add(EDC_NAMESPACE + "uri", url)
+                .add(EDC_NAMESPACE + "events", events.stream().collect(Json::createArrayBuilder, JsonArrayBuilder::add, JsonArrayBuilder::add).build()).build();
+    }
+
+    private HttpResponse cacheEdr(HttpRequest request, Map<String, TransferProcessStarted> events) {
+
+        try {
+            var event = MAPPER.readValue(request.getBody().toString(), new TypeReference<EventEnvelope<TransferProcessStarted>>() {
+            });
+            events.put(event.getPayload().getTransferProcessId(), event.getPayload());
+            return response().withStatusCode(HttpStatusCode.OK_200.code()).withHeader(HttpHeaderNames.CONTENT_TYPE.toString(), MediaType.PLAIN_TEXT_UTF_8.toString()).withBody("{}");
+
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
     }
-
 }

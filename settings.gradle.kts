@@ -38,6 +38,9 @@ dependencyResolutionManagement {
         create("stableLibs") {
             from(files("./gradle/libs.stable.versions.toml"))
         }
+        create("libs010") {
+            from(files("./gradle/libs.0.10.0.versions.toml"))
+        }
     }
 }
 
@@ -46,4 +49,6 @@ include(":runtimes:snapshot:controlplane-snapshot")
 include(":runtimes:snapshot:dataplane-snapshot")
 include(":runtimes:stable:controlplane-stable")
 include(":runtimes:stable:dataplane-stable")
+include(":runtimes:010:controlplane-010")
+include(":runtimes:010:dataplane-010")
 include(":tests:compatibility-tests")
