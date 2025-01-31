@@ -62,36 +62,25 @@ import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 @EndToEndTest
 public class TransferEndToEndTest {
+    //hello
+    protected static final LocalParticipant LOCAL_PARTICIPANT = LocalParticipant.Builder.newInstance().name("local").id("local").build();
 
-    protected static final LocalParticipant LOCAL_PARTICIPANT = LocalParticipant.Builder.newInstance()
-            .name("local")
-            .id("local")
-            .build();
-
-    protected static final RemoteParticipant REMOTE_PARTICIPANT = RemoteParticipant.Builder.newInstance()
-            .name("remote")
-            .id("remote")
-            .build();
+    protected static final RemoteParticipant REMOTE_PARTICIPANT = RemoteParticipant.Builder.newInstance().name("remote").id("remote").build();
 
     @Order(1)
     @RegisterExtension
-    static final RuntimeExtension LOCAL_CONTROL_PLANE = new RuntimePerClassExtension(
-            Runtimes.CONTROL_PLANE.create("local-control-plane", LOCAL_PARTICIPANT.controlPlanePostgresConfiguration()));
+    static final RuntimeExtension LOCAL_CONTROL_PLANE = new RuntimePerClassExtension(Runtimes.CONTROL_PLANE.create("local-control-plane", LOCAL_PARTICIPANT.controlPlanePostgresConfiguration()));
 
     @Order(2)
     @RegisterExtension
-    static final RuntimeExtension LOCAL_DATA_PLANE = new RuntimePerClassExtension(
-            Runtimes.DATA_PLANE.create("local-data-plane", LOCAL_PARTICIPANT.dataPlanePostgresConfiguration()));
+    static final RuntimeExtension LOCAL_DATA_PLANE = new RuntimePerClassExtension(Runtimes.DATA_PLANE.create("local-data-plane", LOCAL_PARTICIPANT.dataPlanePostgresConfiguration()));
 
 
     private static final GenericContainer<?> CONTROL_PLANE = EdcDockerRuntimes.CONTROL_PLANE.create("controlplane", REMOTE_PARTICIPANT.controlPlaneEnv());
 
     private static final GenericContainer<?> DATA_PLANE = EdcDockerRuntimes.DATA_PLANE.create("dataplane", REMOTE_PARTICIPANT.dataPlaneEnv());
 
-    private static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:16.4")
-            .withUsername("postgres")
-            .withPassword("password")
-            .withCreateContainerCmdModifier(cmd -> cmd.withName("postgres"));
+    private static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:16.4").withUsername("postgres").withPassword("password").withCreateContainerCmdModifier(cmd -> cmd.withName("postgres"));
 
     @Order(0)
     @RegisterExtension
@@ -112,12 +101,7 @@ public class TransferEndToEndTest {
     }
 
     private static @NotNull Map<String, Object> httpSourceDataAddress() {
-        return Map.of(
-                EDC_NAMESPACE + "name", "transfer-test",
-                EDC_NAMESPACE + "baseUrl", "http://localhost:" + providerDataSource.getPort() + "/source",
-                EDC_NAMESPACE + "type", "HttpData",
-                EDC_NAMESPACE + "proxyQueryParams", "true"
-        );
+        return Map.of(EDC_NAMESPACE + "name", "transfer-test", EDC_NAMESPACE + "baseUrl", "http://localhost:" + providerDataSource.getPort() + "/source", EDC_NAMESPACE + "type", "HttpData", EDC_NAMESPACE + "proxyQueryParams", "true");
     }
 
     @BeforeEach
@@ -138,27 +122,21 @@ public class TransferEndToEndTest {
         var sourceDataAddress = httpSourceDataAddress();
         createResourcesOnProvider(provider, assetId, PolicyFixtures.contractExpiresIn("5s"), sourceDataAddress);
 
-        var transferProcessId = consumer.requestAssetFrom(assetId, provider)
-                .withTransferType("HttpData-PULL")
-                .execute();
+        var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
 
         consumer.awaitTransferToBeInState(transferProcessId, STARTED);
 
-        var edr = await().atMost(consumer.getTimeout())
-                .until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
+        var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
 
         // Do the transfer
         var msg = UUID.randomUUID().toString();
-        await().atMost(consumer.getTimeout())
-                .untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data")));
 
         // checks that the EDR is gone once the contract expires
-        await().atMost(consumer.getTimeout())
-                .untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.getEdr(transferProcessId)));
 
         // checks that transfer fails
-        await().atMost(consumer.getTimeout())
-                .untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
+        await().atMost(consumer.getTimeout()).untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
 
         providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
 
@@ -174,9 +152,7 @@ public class TransferEndToEndTest {
         var assetId = UUID.randomUUID().toString();
         createResourcesOnProvider(provider, assetId, PolicyFixtures.noConstraintPolicy(), httpSourceDataAddress());
 
-        var transferProcessId = consumer.requestAssetFrom(assetId, provider)
-                .withTransferType("HttpData-PULL")
-                .execute();
+        var transferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
 
         consumer.awaitTransferToBeInState(transferProcessId, STARTED);
 
@@ -216,12 +192,8 @@ public class TransferEndToEndTest {
     private static class ParticipantsArgProvider implements ArgumentsProvider {
         @Override
         public Stream<? extends Arguments> provideArguments(ExtensionContext context) throws Exception {
-            return Stream.of(
-                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http"),
-                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http"),
-                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http:2024/1"),
-                    Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http:2024/1")
-            );
+            return Stream.of(Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http"), Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http"),
+                    Arguments.of(REMOTE_PARTICIPANT, LOCAL_PARTICIPANT, "dataspace-protocol-http:2024/1"), Arguments.of(LOCAL_PARTICIPANT, REMOTE_PARTICIPANT, "dataspace-protocol-http:2024/1"));
         }
     }
 
