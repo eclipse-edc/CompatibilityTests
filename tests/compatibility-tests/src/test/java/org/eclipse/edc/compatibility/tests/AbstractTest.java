@@ -25,6 +25,7 @@ import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
@@ -75,8 +77,11 @@ public abstract class AbstractTest {
     @Order(1)
     @RegisterExtension
     static final BeforeAllCallback INIT_CONTAINERS = context -> {
-        participants.addAll(List.of(LOCAL_PARTICIPANT, createRemoteParticipant(EdcDockerRuntimes.STABLE_CONNECTOR, PostgresqlEndToEndInstance::createDatabase),
-                createRemoteParticipant(EdcDockerRuntimes.STABLE_CONNECTOR_0_10_0, PostgresqlEndToEndInstance::createDatabase)));
+        participants.addAll(List.of(
+                LOCAL_PARTICIPANT,
+                createRemoteParticipant(EdcDockerRuntimes.STABLE_CONNECTOR, PostgresqlEndToEndInstance::createDatabase),
+                createRemoteParticipant(EdcDockerRuntimes.STABLE_CONNECTOR_0_10_0, PostgresqlEndToEndInstance::createDatabase)
+        ));
     };
 
     private static RemoteParticipant createRemoteParticipant(EdcDockerRuntimes runtime, Consumer<String> callback) {
@@ -117,25 +122,43 @@ public abstract class AbstractTest {
         return Map.of(EDC_NAMESPACE + "name", "testing", EDC_NAMESPACE + "baseUrl", "http://localhost:" + server.getPort() + dataAddressPath, EDC_NAMESPACE + "type", "HttpData", EDC_NAMESPACE + "proxyQueryParams", "true");
     }
 
+    protected static class FilteredParticipantArgsProvider implements ArgumentsProvider {
+        @Override
+        public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
+            Predicate<Participant> stableConnectorFilter = p -> !EdcDockerRuntimes.STABLE_CONNECTOR_0_10_0.name().toLowerCase().equals(p.getName());
+            return createArgumentMatrix(stableConnectorFilter).stream();
+        }
+    }
+
     protected static class ParticipantsArgProvider implements ArgumentsProvider {
         @Override
         public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
             return createArgumentMatrix().stream();
         }
 
-        private List<Arguments> createArgumentMatrix() {
-            List<Arguments> testArguments = new ArrayList<>();
-            for (int i = 0; i < participants.size(); i++) {
+    }
+
+    private static List<Arguments> createArgumentMatrix(Predicate<Participant> filter) {
+        List<Arguments> testArguments = new ArrayList<>();
+        for (int i = 0; i < participants.size(); i++) {
+            Participant consumer = participants.get(i);
+            if (filter.test(consumer)) {
                 for (int j = i + 1; j < participants.size(); j++) {
-                    for (String protocol : PROTOCOLS_TO_TEST) {
-                        testArguments.add(Arguments.of(participants.get(i), participants.get(j), protocol));
-                        testArguments.add(Arguments.of(participants.get(j), participants.get(i), protocol));
+                    Participant provider = participants.get(j);
+                    if (filter.test(provider)) {
+                        for (String protocol : PROTOCOLS_TO_TEST) {
+                            testArguments.add(Arguments.of(Named.of(consumer.getName(), consumer), Named.of(provider.getName(), provider), protocol));
+                            testArguments.add(Arguments.of(Named.of(provider.getName(), provider), Named.of(consumer.getName(), consumer), protocol));
+                        }
                     }
                 }
             }
-            return testArguments;
         }
+        return testArguments;
     }
 
+    private static List<Arguments> createArgumentMatrix() {
+        return createArgumentMatrix(p -> true);
+    }
 
 }

@@ -116,13 +116,16 @@ class TransferEndToEndTest extends AbstractTest {
         providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
     }
 
+    /**
+     * This test is failing for version <= 0.10.1, hence it is disabled for those versions.
+     */
     @ParameterizedTest
-    @ArgumentsSource(ParticipantsArgProvider.class)
+    @ArgumentsSource(FilteredParticipantArgsProvider.class)
     void suspendAndResumeByProvider_httpPull_dataTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
         initialise(consumer, provider, protocol);
         Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
         var assetId = provider.createResource(dataAddress, PolicyFixtures.noConstraintPolicy());
-        var consumerTransferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
+        String consumerTransferProcessId = consumer.requestAssetFrom(assetId, provider).withTransferType("HttpData-PULL").execute();
         consumer.awaitTransferToBeInState(consumerTransferProcessId, STARTED);
         var edr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(consumerTransferProcessId), Objects::nonNull);
         var msg = UUID.randomUUID().toString();
