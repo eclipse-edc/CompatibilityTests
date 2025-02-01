@@ -120,7 +120,7 @@ class TransferEndToEndTest extends AbstractTest {
      * This test is failing for version <= 0.10.1, hence it is disabled for those versions.
      */
     @ParameterizedTest
-    @ArgumentsSource(FilteredParticipantArgsProvider.class)
+    @ArgumentsSource(SuspendResumeTransferByProviderArgs.class)
     void suspendAndResumeByProvider_httpPull_dataTransfer(BaseParticipant consumer, BaseParticipant provider, String protocol) {
         initialise(consumer, provider, protocol);
         Map<String, Object> dataAddress = createDataAddress(providerDataSource, "/source");
