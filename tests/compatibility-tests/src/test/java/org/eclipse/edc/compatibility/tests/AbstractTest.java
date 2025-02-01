@@ -122,11 +122,11 @@ public abstract class AbstractTest {
         return Map.of(EDC_NAMESPACE + "name", "testing", EDC_NAMESPACE + "baseUrl", "http://localhost:" + server.getPort() + dataAddressPath, EDC_NAMESPACE + "type", "HttpData", EDC_NAMESPACE + "proxyQueryParams", "true");
     }
 
-    protected static class FilteredParticipantArgsProvider implements ArgumentsProvider {
+    protected static class SuspendResumeTransferByProviderArgs implements ArgumentsProvider {
         @Override
         public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
-            Predicate<Participant> stableConnectorFilter = p -> !EdcDockerRuntimes.STABLE_CONNECTOR_0_10_0.name().toLowerCase().equals(p.getName());
-            return createArgumentMatrix(stableConnectorFilter).stream();
+            Predicate<Participant> filterConsumer = p -> !EdcDockerRuntimes.STABLE_CONNECTOR_0_10_0.name().toLowerCase().equals(p.getName());
+            return createArgumentMatrix(filterConsumer, p -> Boolean.TRUE).stream();
         }
     }
 
@@ -138,18 +138,18 @@ public abstract class AbstractTest {
 
     }
 
-    private static List<Arguments> createArgumentMatrix(Predicate<Participant> filter) {
+    private static List<Arguments> createArgumentMatrix(Predicate<Participant> canBeConsumer, Predicate<Participant> canBeProvider) {
         List<Arguments> testArguments = new ArrayList<>();
         for (int i = 0; i < participants.size(); i++) {
             Participant consumer = participants.get(i);
-            if (filter.test(consumer)) {
-                for (int j = i + 1; j < participants.size(); j++) {
-                    Participant provider = participants.get(j);
-                    if (filter.test(provider)) {
-                        for (String protocol : PROTOCOLS_TO_TEST) {
-                            testArguments.add(Arguments.of(Named.of(consumer.getName(), consumer), Named.of(provider.getName(), provider), protocol));
-                            testArguments.add(Arguments.of(Named.of(provider.getName(), provider), Named.of(consumer.getName(), consumer), protocol));
-                        }
+            for (int j = i + 1; j < participants.size(); j++) {
+                Participant provider = participants.get(j);
+                for (String protocol : PROTOCOLS_TO_TEST) {
+                    if (canBeConsumer.test(consumer) && canBeProvider.test(provider)) {
+                        testArguments.add(Arguments.of(Named.of(consumer.getName(), consumer), Named.of(provider.getName(), provider), protocol));
+                    }
+                    if (canBeConsumer.test(provider) && canBeProvider.test(consumer)) {
+                        testArguments.add(Arguments.of(Named.of(provider.getName(), provider), Named.of(consumer.getName(), consumer), protocol));
                     }
                 }
             }
@@ -158,7 +158,7 @@ public abstract class AbstractTest {
     }
 
     private static List<Arguments> createArgumentMatrix() {
-        return createArgumentMatrix(p -> true);
+        return createArgumentMatrix(p -> Boolean.TRUE, p -> Boolean.TRUE);
     }
 
 }
