@@ -16,6 +16,7 @@ package org.eclipse.edc.compatibility.tests.transfer;
 
 import jakarta.json.JsonObject;
 import org.eclipse.edc.compatibility.tests.fixtures.BaseParticipant;
+import org.eclipse.edc.compatibility.tests.fixtures.DockerRuntimeExtension;
 import org.eclipse.edc.compatibility.tests.fixtures.EdcDockerRuntimes;
 import org.eclipse.edc.compatibility.tests.fixtures.LocalParticipant;
 import org.eclipse.edc.compatibility.tests.fixtures.RemoteParticipant;
@@ -25,7 +26,10 @@ import org.eclipse.edc.junit.annotations.EndToEndTest;
 import org.eclipse.edc.junit.extensions.RuntimeExtension;
 import org.eclipse.edc.junit.extensions.RuntimePerClassExtension;
 import org.eclipse.edc.spi.security.Vault;
+import org.eclipse.edc.spi.system.ServiceExtension;
+import org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndExtension;
 import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
@@ -39,13 +43,12 @@ import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.mockserver.integration.ClientAndServer;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,7 +58,6 @@ import static org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFix
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.STARTED;
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.SUSPENDED;
 import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
-import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.createDatabase;
 import static org.eclipse.edc.util.io.Ports.getFreePort;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
@@ -73,41 +75,58 @@ public class TransferEndToEndTest {
             .id("remote")
             .build();
 
+    @Order(0)
+    @RegisterExtension
+    static final PostgresqlEndToEndExtension POSTGRESQL_EXTENSION = new PostgresqlEndToEndExtension();
+
+    @Order(5)
+    @RegisterExtension
+    static final DockerRuntimeExtension DATA_PLANE_T = EdcDockerRuntimes.DATA_PLANE.create("dataplane")
+            .envProvider(REMOTE_PARTICIPANT::dataPlaneEnv)
+            .envProvider(pgEnv(REMOTE_PARTICIPANT.getName()));
+
+    @Order(4)
+    @RegisterExtension
+    static final DockerRuntimeExtension CONTROL_PLANE_T = EdcDockerRuntimes.CONTROL_PLANE.create("controlplane")
+            .envProvider(REMOTE_PARTICIPANT::controlPlaneEnv)
+            .envProvider(pgEnv(REMOTE_PARTICIPANT.getName()));
     @Order(1)
     @RegisterExtension
-    static final RuntimeExtension LOCAL_CONTROL_PLANE = new RuntimePerClassExtension(
-            Runtimes.CONTROL_PLANE.create("local-control-plane", LOCAL_PARTICIPANT.controlPlanePostgresConfiguration()));
+    static final BeforeAllCallback CREATE_DATABASES = context -> {
+        POSTGRESQL_EXTENSION.createDatabase(LOCAL_PARTICIPANT.getName());
+        POSTGRESQL_EXTENSION.createDatabase(REMOTE_PARTICIPANT.getName());
+    };
 
     @Order(2)
     @RegisterExtension
-    static final RuntimeExtension LOCAL_DATA_PLANE = new RuntimePerClassExtension(
-            Runtimes.DATA_PLANE.create("local-data-plane", LOCAL_PARTICIPANT.dataPlanePostgresConfiguration()));
-
-
-    private static final GenericContainer<?> CONTROL_PLANE = EdcDockerRuntimes.CONTROL_PLANE.create("controlplane", REMOTE_PARTICIPANT.controlPlaneEnv());
-
-    private static final GenericContainer<?> DATA_PLANE = EdcDockerRuntimes.DATA_PLANE.create("dataplane", REMOTE_PARTICIPANT.dataPlaneEnv());
-
-    private static final PostgreSQLContainer<?> PG = new PostgreSQLContainer<>("postgres:16.4")
-            .withUsername("postgres")
-            .withPassword("password")
-            .withCreateContainerCmdModifier(cmd -> cmd.withName("postgres"));
-
-    @Order(0)
+    static final RuntimeExtension LOCAL_CONTROL_PLANE = new RuntimePerClassExtension(
+            Runtimes.CONTROL_PLANE.create("local-control-plane")
+                    .configurationProvider(LOCAL_PARTICIPANT::controlPlaneConfiguration)
+                    .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(LOCAL_PARTICIPANT.getName())));
+    @Order(3)
     @RegisterExtension
-    static final BeforeAllCallback CREATE_DATABASES = context -> {
-        PG.setPortBindings(List.of("5432:5432"));
-        PG.start();
-        createDatabase(LOCAL_PARTICIPANT.getName());
-        createDatabase(REMOTE_PARTICIPANT.getName());
-    };
+    static final RuntimeExtension LOCAL_DATA_PLANE = new RuntimePerClassExtension(
+            Runtimes.DATA_PLANE.create("local-data-plane")
+                    .configurationProvider(LOCAL_PARTICIPANT::dataPlaneConfiguration)
+                    .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(LOCAL_PARTICIPANT.getName()))
+                    .registerSystemExtension(ServiceExtension.class, new HttpProxyDataPlaneExtension()));
 
     private static ClientAndServer providerDataSource;
 
+    static Supplier<Map<String, String>> pgEnv(String databaseName) {
+        return () -> {
+            var cfg = POSTGRESQL_EXTENSION.configFor(databaseName);
+            return cfg.getEntries().entrySet().stream()
+                    .collect(Collectors.toMap(e -> toEnv(e.getKey()), Map.Entry::getValue));
+        };
+    }
+
+    static String toEnv(String cfg) {
+        return cfg.toUpperCase().replace('.', '_');
+    }
+
     @BeforeAll
     static void beforeAll() {
-        CONTROL_PLANE.start();
-        DATA_PLANE.start();
         providerDataSource = startClientAndServer(getFreePort());
     }
 
@@ -118,6 +137,11 @@ public class TransferEndToEndTest {
                 EDC_NAMESPACE + "type", "HttpData",
                 EDC_NAMESPACE + "proxyQueryParams", "true"
         );
+    }
+
+    @AfterEach
+    void afterEach() {
+        providerDataSource.reset();
     }
 
     @BeforeEach
@@ -160,7 +184,10 @@ public class TransferEndToEndTest {
         await().atMost(consumer.getTimeout())
                 .untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
 
-        providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+
+        if (provider.hasProxySupport()) {
+            providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+        }
 
     }
 
@@ -202,7 +229,9 @@ public class TransferEndToEndTest {
         var secondMessage = UUID.randomUUID().toString();
         await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(secondEdr, Map.of("message", secondMessage), body -> assertThat(body).isEqualTo("data")));
 
-        providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+        if (provider.hasProxySupport()) {
+            providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
+        }
     }
 
     protected void createResourcesOnProvider(BaseParticipant provider, String assetId, JsonObject contractPolicy, Map<String, Object> dataAddressProperties) {

@@ -115,6 +115,14 @@ public abstract class BaseParticipant extends Participant {
 
     }
 
+    /**
+     * Since the http proxy is not supported in the recent EDC version we need to distinguish between the two.
+     * for checking if the mocked backend gets called or not.
+     * This can be removed once the http proxy is not supported in both tested versions.
+     */
+
+    public abstract boolean hasProxySupport();
+
     public void awaitTransferToBeInState(String transferProcessId, TransferProcessStates state) {
         await().atMost(timeout).until(
                 () -> getTransferProcessState(transferProcessId),

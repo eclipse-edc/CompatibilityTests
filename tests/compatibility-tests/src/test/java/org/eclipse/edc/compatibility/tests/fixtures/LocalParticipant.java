@@ -14,11 +14,13 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
+import org.eclipse.edc.spi.system.configuration.Config;
+import org.eclipse.edc.spi.system.configuration.ConfigFactory;
+
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.eclipse.edc.boot.BootServicesExtension.PARTICIPANT_ID;
-import static org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndInstance.defaultDatasourceConfiguration;
 import static org.eclipse.edc.util.io.Ports.getFreePort;
 
 public class LocalParticipant extends BaseParticipant {
@@ -27,8 +29,8 @@ public class LocalParticipant extends BaseParticipant {
 
     private final int httpProvisionerPort = getFreePort();
 
-    public Map<String, String> controlPlaneConfiguration() {
-        return new HashMap<>() {
+    public Config controlPlaneConfiguration() {
+        return ConfigFactory.fromMap(new HashMap<>() {
             {
                 put(PARTICIPANT_ID, id);
                 put("web.http.port", String.valueOf(controlPlaneDefault.getPort()));
@@ -60,18 +62,11 @@ public class LocalParticipant extends BaseParticipant {
                 put("provisioner.http.entries.default.endpoint", "http://localhost:%d/provision".formatted(httpProvisionerPort));
                 put("provisioner.http.entries.default.data.address.type", "HttpProvision");
             }
-        };
+        });
     }
 
-    public Map<String, String> controlPlanePostgresConfiguration() {
-        var baseConfiguration = controlPlaneConfiguration();
-        baseConfiguration.putAll(defaultDatasourceConfiguration(getName()));
-        baseConfiguration.put("edc.sql.schema.autocreate", "true");
-        return baseConfiguration;
-    }
-
-    public Map<String, String> dataPlaneConfiguration() {
-        return new HashMap<>() {
+    public Config dataPlaneConfiguration() {
+        return ConfigFactory.fromMap(new HashMap<>() {
             {
                 put("web.http.port", String.valueOf(dataPlaneDefault.getPort()));
                 put("web.http.path", "/api");
@@ -88,14 +83,12 @@ public class LocalParticipant extends BaseParticipant {
                 put("edc.dpf.selector.url", controlPlaneControl + "/v1/dataplanes");
                 put("edc.component.id", "dataplane");
             }
-        };
+        });
     }
 
-    public Map<String, String> dataPlanePostgresConfiguration() {
-        var baseConfiguration = dataPlaneConfiguration();
-        baseConfiguration.putAll(defaultDatasourceConfiguration(getName()));
-        baseConfiguration.put("edc.sql.schema.autocreate", "true");
-        return baseConfiguration;
+    @Override
+    public boolean hasProxySupport() {
+        return false;
     }
 
     public static class Builder extends BaseParticipant.Builder<LocalParticipant, Builder> {
