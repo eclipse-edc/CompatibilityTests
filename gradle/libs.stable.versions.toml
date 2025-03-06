@@ -27,7 +27,6 @@ edc-identity-vc-ldp = { module = "org.eclipse.edc:ldp-verifiable-credentials", v
 edc-identity-vc-jwt = { module = "org.eclipse.edc:jwt-verifiable-credentials", version.ref = "edc" }
 edc-vault-hashicorp = { module = "org.eclipse.edc:vault-hashicorp", version.ref = "edc" }
 edc-jsonld = { module = "org.eclipse.edc:json-ld", version.ref = "edc" }
-edc-junit = { module = "org.eclipse.edc:junit", version.ref = "edc" }
 edc-jersey-core = { module = "org.eclipse.edc:jersey-core", version.ref = "edc" }
 edc-jetty-core = { module = "org.eclipse.edc:jetty-core", version.ref = "edc" }
 edc-configuration-filesystem = { module = "org.eclipse.edc:configuration-filesystem", version.ref = "edc" }

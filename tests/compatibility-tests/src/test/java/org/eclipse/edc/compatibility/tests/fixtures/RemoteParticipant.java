@@ -37,10 +37,6 @@ public class RemoteParticipant extends BaseParticipant {
                 put("WEB_HTTP_CONTROL_PORT", String.valueOf(controlPlaneControl.getPort()));
                 put("WEB_HTTP_CONTROL_PATH", controlPlaneControl.getPath());
                 put("EDC_DSP_CALLBACK_ADDRESS", controlPlaneProtocol.get().toString());
-                put("EDC_DATASOURCE_DEFAULT_URL", "jdbc:postgresql://localhost:5432/%s".formatted(getId()));
-                put("EDC_DATASOURCE_DEFAULT_USER", "postgres");
-                put("EDC_DATASOURCE_DEFAULT_PASSWORD", "password");
-                put("EDC_SQL_SCHEMA_AUTOCREATE", "true");
             }
         };
     }
@@ -57,10 +53,6 @@ public class RemoteParticipant extends BaseParticipant {
                 put("WEB_HTTP_VERSION_PATH", dataPlaneVersion.getPath());
                 put("WEB_HTTP_CONTROL_PORT", String.valueOf(dataPlaneControl.getPort()));
                 put("WEB_HTTP_CONTROL_PATH", dataPlaneControl.getPath());
-                put("EDC_DATASOURCE_DEFAULT_URL", "jdbc:postgresql://localhost:5432/%s".formatted(getId()));
-                put("EDC_DATASOURCE_DEFAULT_USER", "postgres");
-                put("EDC_DATASOURCE_DEFAULT_PASSWORD", "password");
-                put("EDC_SQL_SCHEMA_AUTOCREATE", "true");
                 put("EDC_TRANSFER_PROXY_TOKEN_SIGNER_PRIVATEKEY_ALIAS", "private-key");
                 put("EDC_TRANSFER_PROXY_TOKEN_VERIFIER_PUBLICKEY_ALIAS", "public-key");
                 put("EDC_DPF_SELECTOR_URL", controlPlaneControl + "/v1/dataplanes");
@@ -71,6 +63,11 @@ public class RemoteParticipant extends BaseParticipant {
 
             }
         };
+    }
+
+    @Override
+    public boolean hasProxySupport() {
+        return true;
     }
 
     public static class Builder extends BaseParticipant.Builder<RemoteParticipant, Builder> {

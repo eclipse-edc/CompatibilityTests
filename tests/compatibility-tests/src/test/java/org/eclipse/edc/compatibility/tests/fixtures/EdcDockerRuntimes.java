@@ -14,11 +14,6 @@
 
 package org.eclipse.edc.compatibility.tests.fixtures;
 
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-
-import java.util.Map;
-
 public enum EdcDockerRuntimes {
 
     CONTROL_PLANE(
@@ -35,11 +30,7 @@ public enum EdcDockerRuntimes {
         this.image = image;
     }
 
-    public GenericContainer<?> create(String name, Map<String, String> env) {
-        return new GenericContainer<>(image)
-                .withCreateContainerCmdModifier(cmd -> cmd.withName(name))
-                .withNetworkMode("host")
-                .waitingFor(Wait.forLogMessage(".*Runtime .* ready.*", 1))
-                .withEnv(env);
+    public DockerRuntimeExtension create(String name) {
+        return new DockerRuntimeExtension(image, name);
     }
 }

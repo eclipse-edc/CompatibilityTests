@@ -18,6 +18,7 @@ plugins {
 
 dependencies {
     testImplementation(libs.edc.junit)
+    testImplementation(libs.edc.spi.dataplane)
     testImplementation(libs.jakarta.json.api)
     testImplementation(libs.jackson.datatype.jakarta.jsonp)
     testImplementation(libs.restAssured)
