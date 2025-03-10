@@ -40,8 +40,7 @@ plugins {
 }
 
 dependencies {
-    runtimeOnly(libs.edc.bom.controlplane)
-    runtimeOnly(libs.edc.bom.controlplane.sql)
+    runtimeOnly(project(":runtimes:snapshot:controlplane-snapshot-base"))
     runtimeOnly(libs.edc.iam.mock)
 }
 

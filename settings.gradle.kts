@@ -42,8 +42,14 @@ dependencyResolutionManagement {
 }
 
 // add dependencies
+include(":runtimes:snapshot:controlplane-snapshot-base")
 include(":runtimes:snapshot:controlplane-snapshot")
+include(":runtimes:snapshot:controlplane-snapshot-dcp")
 include(":runtimes:snapshot:dataplane-snapshot")
+include(":runtimes:snapshot:issuerservice-snapshot")
+include(":runtimes:snapshot:identity-hub-snapshot")
 include(":runtimes:stable:controlplane-stable")
 include(":runtimes:stable:dataplane-stable")
 include(":tests:compatibility-tests")
+include(":tests:dcp-tests")
+include(":tests:fixtures")
