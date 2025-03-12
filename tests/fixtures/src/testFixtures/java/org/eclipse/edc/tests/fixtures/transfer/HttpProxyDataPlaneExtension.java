@@ -12,7 +12,7 @@
  *
  */
 
-package org.eclipse.edc.compatibility.tests.transfer;
+package org.eclipse.edc.tests.fixtures.transfer;
 
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
