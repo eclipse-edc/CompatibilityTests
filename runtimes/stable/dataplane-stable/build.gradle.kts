@@ -22,20 +22,11 @@ plugins {
 }
 
 dependencies {
-    implementation(stableLibs.edc.runtime.metamodel)
-    implementation(stableLibs.edc.boot.spi)
-    runtimeOnly(stableLibs.edc.spi.core)
-    runtimeOnly(stableLibs.edc.api.observability)
-    runtimeOnly(stableLibs.edc.core.connector)
-    runtimeOnly(stableLibs.edc.boot)
-    runtimeOnly(stableLibs.bundles.dataplane)
-    runtimeOnly(stableLibs.edc.jsonld) // needed by the DataPlaneSignalingApi
-    runtimeOnly(stableLibs.edc.dpf.selector.client) // for the selector service -> self registration
-
-    // uncomment the following lines to compile with Hashicorp Vault and Postgres persistence
-    // runtimeOnly(libs.edc.vault.hashicorp)
-    runtimeOnly(stableLibs.bundles.sql.dataplane)
-
+    api(stableLibs.edc.spi.core)
+    api(stableLibs.edc.spi.dataplane)
+    api(stableLibs.edc.spi.web)
+    runtimeOnly(stableLibs.edc.bom.dataplane)
+    runtimeOnly(stableLibs.edc.bom.dataplane.sql)
 }
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {

@@ -43,13 +43,14 @@ public class DockerParticipant {
         return new HashMap<>() {
             {
                 put("EDC_PARTICIPANT_ID", controlPlaneApi.getId());
-                put("EDC_API_AUTH_KEY", API_KEY);
                 put("WEB_HTTP_PORT", String.valueOf(controlPlaneDefault.getPort()));
                 put("WEB_HTTP_PATH", "/api");
                 put("WEB_HTTP_PROTOCOL_PORT", String.valueOf(controlPlaneApi.getControlPlaneProtocol().getPort()));
                 put("WEB_HTTP_PROTOCOL_PATH", controlPlaneApi.getControlPlaneProtocol().getPath());
                 put("WEB_HTTP_MANAGEMENT_PORT", String.valueOf(controlPlaneApi.getControlPlaneManagement().getPort()));
                 put("WEB_HTTP_MANAGEMENT_PATH", controlPlaneApi.getControlPlaneManagement().getPath());
+                put("WEB_HTTP_MANAGEMENT_AUTH_TYPE", "tokenbased");
+                put("WEB_HTTP_MANAGEMENT_AUTH_KEY", API_KEY);
                 put("WEB_HTTP_VERSION_PORT", String.valueOf(controlPlaneVersion.getPort()));
                 put("WEB_HTTP_VERSION_PATH", controlPlaneVersion.getPath());
                 put("WEB_HTTP_CONTROL_PORT", String.valueOf(controlPlaneControl.getPort()));
@@ -58,7 +59,7 @@ public class DockerParticipant {
             }
         };
     }
-    
+
     public ControlPlaneApi getControlPlaneApi() {
         return controlPlaneApi;
     }

@@ -22,16 +22,9 @@ plugins {
 }
 
 dependencies {
-    runtimeOnly(stableLibs.edc.spi.core) // we need some constants
-
-    runtimeOnly(stableLibs.bundles.controlplane)
-    runtimeOnly(stableLibs.edc.core.connector)
-
-    runtimeOnly(stableLibs.bundles.dpf)
-    runtimeOnly(stableLibs.edc.api.version)
-    // uncomment the following lines to compile with Hashicorp Vault and Postgres persistence
-    // runtimeOnly(stableLibs.edc.vault.hashicorp)
-    runtimeOnly(stableLibs.bundles.sql.controlplane)
+    runtimeOnly(stableLibs.edc.bom.controlplane)
+    runtimeOnly(stableLibs.edc.bom.controlplane.sql)
+    runtimeOnly(stableLibs.edc.iam.mock)
 
 }
 

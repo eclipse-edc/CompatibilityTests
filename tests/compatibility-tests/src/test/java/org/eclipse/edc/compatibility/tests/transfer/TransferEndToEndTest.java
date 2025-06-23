@@ -167,9 +167,9 @@ public class TransferEndToEndTest {
 
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
-    void httpPullTransfer(ControlPlaneApi consumer, ControlPlaneApi provider, String protocol, boolean hasProxySupport) {
-        consumer.setProtocol(protocol);
-        provider.setProtocol(protocol);
+    void httpPullTransfer(ControlPlaneApi consumer, ControlPlaneApi provider, String protocol, String path, boolean hasProxySupport) {
+        consumer.setProtocol(protocol, path);
+        provider.setProtocol(protocol, path);
         provider.waitForDataPlane();
         providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
         var assetId = UUID.randomUUID().toString();
@@ -207,9 +207,9 @@ public class TransferEndToEndTest {
 
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
-    void suspendAndResume_httpPull_dataTransfer(ControlPlaneApi consumer, ControlPlaneApi provider, String protocol, boolean hasProxySupport) {
-        consumer.setProtocol(protocol);
-        provider.setProtocol(protocol);
+    void suspendAndResume_httpPull_dataTransfer(ControlPlaneApi consumer, ControlPlaneApi provider, String protocol, String path, boolean hasProxySupport) {
+        consumer.setProtocol(protocol, path);
+        provider.setProtocol(protocol, path);
         provider.waitForDataPlane();
         providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
         var assetId = UUID.randomUUID().toString();
@@ -263,10 +263,10 @@ public class TransferEndToEndTest {
             var localParticipant = LOCAL_CONTROL_PLANE.getControlPlaneApi();
             var remoteParticipant = REMOTE_PARTICIPANT.getControlPlaneApi();
             return Stream.of(
-                    Arguments.of(remoteParticipant, localParticipant, "dataspace-protocol-http", false),
-                    Arguments.of(localParticipant, remoteParticipant, "dataspace-protocol-http", true),
-                    Arguments.of(remoteParticipant, localParticipant, "dataspace-protocol-http:2024/1", false),
-                    Arguments.of(localParticipant, remoteParticipant, "dataspace-protocol-http:2024/1", true)
+                    Arguments.of(remoteParticipant, localParticipant, "dataspace-protocol-http", "", false),
+                    Arguments.of(localParticipant, remoteParticipant, "dataspace-protocol-http", "", false),
+                    Arguments.of(remoteParticipant, localParticipant, "dataspace-protocol-http:2024/1", "/2024/1", false),
+                    Arguments.of(localParticipant, remoteParticipant, "dataspace-protocol-http:2024/1", "/2024/1", false)
             );
         }
     }

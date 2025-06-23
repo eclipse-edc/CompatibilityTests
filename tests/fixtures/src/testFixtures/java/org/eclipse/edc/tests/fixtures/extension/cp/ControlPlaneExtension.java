@@ -121,7 +121,6 @@ public class ControlPlaneExtension extends ComponentExtension {
                 put("provisioner.http.entries.default.provisioner.type", "provider");
                 put("provisioner.http.entries.default.endpoint", "http://localhost:%d/provision".formatted(httpProvisionerPort));
                 put("provisioner.http.entries.default.data.address.type", "HttpProvision");
-                put("edc.dsp.well-known-path.enabled", "true");
             }
         });
     }
