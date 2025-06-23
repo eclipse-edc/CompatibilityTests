@@ -13,3 +13,4 @@
 #
 
 org.eclipse.edc.compatibility.tests.VaultSeedExtension
+org.eclipse.edc.compatibility.tests.HttpProxyDataPlaneExtension
