@@ -10,7 +10,7 @@ restAssured = "5.5.5"
 awaitility = "4.3.0"
 httpMockServer = "5.15.0"
 testcontainers = "1.21.0"
-bouncyCastle-jdk18on = "1.80"
+bouncyCastle-jdk18on = "1.81"
 
 # add here
 
