@@ -39,6 +39,8 @@ import org.eclipse.edc.transaction.spi.TransactionContext;
 import java.sql.SQLException;
 import java.util.Map;
 
+import static org.eclipse.edc.iam.verifiablecredentials.spi.model.CredentialFormat.VC1_0_JWT;
+
 public class TestFunction {
 
 
@@ -78,6 +80,7 @@ public class TestFunction {
                 .mapping(new MappingDefinition("membership_start_date", "credentialSubject.membershipStartData", true))
                 .rule(new CredentialRuleDefinition("expression", ruleConfiguration))
                 .participantContextId(participantContextId)
+                .formatFrom(VC1_0_JWT)
                 .build();
 
         credentialDefinitionService.createCredentialDefinition(credentialDefinition)
