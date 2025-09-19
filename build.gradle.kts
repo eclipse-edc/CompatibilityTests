@@ -15,6 +15,7 @@
 
 plugins {
     `java-library`
+    alias(libs.plugins.edc.build)
 }
 
 val javaVersion: String by project
@@ -24,12 +25,15 @@ val edcScmConnection: String by project
 buildscript {
     dependencies {
         val version: String by project
-        classpath("org.eclipse.edc.edc-build:org.eclipse.edc.edc-build.gradle.plugin:${version}")
+        classpath("org.eclipse.edc.autodoc:org.eclipse.edc.autodoc.gradle.plugin:$version")
     }
 }
 
+val edcBuildId = libs.plugins.edc.build.get().pluginId
+
 allprojects {
-    apply(plugin = "${group}.edc-build")
+    apply(plugin = edcBuildId)
+    apply(plugin = "org.eclipse.edc.autodoc")
     val version: String by project
     // configure which version of the annotation processor to use. defaults to the same version as the plugin
     configure<org.eclipse.edc.plugins.autodoc.AutodocExtension> {

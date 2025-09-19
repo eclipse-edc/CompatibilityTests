@@ -23,6 +23,7 @@ import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHubE
 import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHubRuntime;
 import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerExtension;
 import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerRuntime;
+import org.eclipse.edc.junit.annotations.EndToEndTest;
 import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.spi.system.ServiceExtension;
 import org.eclipse.edc.spi.system.configuration.Config;
@@ -56,6 +57,7 @@ import static org.eclipse.edc.dcp.tests.transfer.fixtures.TestFunction.setupPart
 import static org.eclipse.edc.junit.testfixtures.TestUtils.getResourceFileContentAsString;
 import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
 
+@EndToEndTest
 public class DcpTransferEndToEndTest {
 
     public static final String CONSUMER_IH = "consumer_ih";
@@ -192,8 +194,8 @@ public class DcpTransferEndToEndTest {
         var providerResponse = setupParticipant(providerRuntime, providerControlPlane);
         var consumerResponse = setupParticipant(consumerRuntime, consumerControlPlane);
 
-        var providerPid = providerApiClient.requestCredential(providerResponse.apiKey(), providerControlPlane.getId(), issuerDid, "MembershipCredential");
-        var consumerPid = consumerApiClient.requestCredential(consumerResponse.apiKey(), consumerControlPlane.getId(), issuerDid, "MembershipCredential");
+        var providerPid = providerApiClient.requestCredential(providerResponse.apiKey(), providerControlPlane.getId(), issuerDid, "credential-id", "MembershipCredential");
+        var consumerPid = consumerApiClient.requestCredential(consumerResponse.apiKey(), consumerControlPlane.getId(), issuerDid, "credential-id", "MembershipCredential");
 
         providerRuntime.waitForCredentialIssuer(providerPid, providerControlPlane.getId());
         consumerRuntime.waitForCredentialIssuer(consumerPid, consumerControlPlane.getId());
