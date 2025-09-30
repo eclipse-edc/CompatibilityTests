@@ -54,5 +54,5 @@ tasks.register("dockerize", DockerBuildImage::class) {
         platform.set(System.getProperty("platform"))
     buildArgs.put("JAR", "build/libs/${project.name}.jar")
     inputDir.set(file(dockerContextDir))
-    dependsOn(tasks.named(ShadowJavaPlugin.SHADOW_JAR_TASK_NAME))
+    dependsOn(tasks.shadowJar)
 }
