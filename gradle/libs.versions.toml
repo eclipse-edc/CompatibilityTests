@@ -9,7 +9,7 @@ jackson = "2.20.0"
 restAssured = "5.5.6"
 awaitility = "4.3.0"
 httpMockServer = "5.15.0"
-testcontainers = "1.21.2"
+testcontainers = "1.21.3"
 bouncyCastle-jdk18on = "1.82"
 
 # add here
