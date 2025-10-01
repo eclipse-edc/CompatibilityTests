@@ -1,3 +1,5 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
+
 /*
  *  Copyright (c) 2024 Bayerische Motoren Werke Aktiengesellschaft (BMW AG)
  *
@@ -44,10 +46,10 @@ dependencies {
     runtimeOnly(libs.edc.iam.mock)
 }
 
-tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
-    exclude("**/pom.properties", "**/pom.xml")
+tasks.shadowJar {
     mergeServiceFiles()
     archiveFileName.set("${project.name}.jar")
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 application {

@@ -55,6 +55,6 @@ bouncyCastle-bcpkixJdk18on = { module = "org.bouncycastle:bcpkix-jdk18on", versi
 
 
 [plugins]
-shadow = { id = "com.gradleup.shadow", version = "8.3.8" }
+shadow = { id = "com.gradleup.shadow", version = "9.2.2" }
 docker = { id = "com.bmuschko.docker-remote-api", version = "9.4.0" }
 edc-build = { id = "org.eclipse.edc.edc-build", version = "1.1.0" }

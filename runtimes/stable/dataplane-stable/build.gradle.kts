@@ -14,6 +14,7 @@
 
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.github.jengelman.gradle.plugins.shadow.ShadowJavaPlugin
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 
 plugins {
     id("application")
@@ -29,10 +30,10 @@ dependencies {
     runtimeOnly(stableLibs.edc.bom.dataplane.sql)
 }
 
-tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
-    exclude("**/pom.properties", "**/pom.xml")
+tasks.shadowJar {
     mergeServiceFiles()
     archiveFileName.set("${project.name}.jar")
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 application {
@@ -54,5 +55,5 @@ tasks.register("dockerize", DockerBuildImage::class) {
         platform.set(System.getProperty("platform"))
     buildArgs.put("JAR", "build/libs/${project.name}.jar")
     inputDir.set(file(dockerContextDir))
-    dependsOn(tasks.named(ShadowJavaPlugin.SHADOW_JAR_TASK_NAME))
+    dependsOn(tasks.shadowJar)
 }
