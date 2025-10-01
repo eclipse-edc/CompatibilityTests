@@ -14,6 +14,7 @@
 
 import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.github.jengelman.gradle.plugins.shadow.ShadowJavaPlugin
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar.Companion.shadowJar
 
 plugins {
     id("application")
@@ -25,13 +26,12 @@ dependencies {
     runtimeOnly(stableLibs.edc.bom.controlplane)
     runtimeOnly(stableLibs.edc.bom.controlplane.sql)
     runtimeOnly(stableLibs.edc.iam.mock)
-
 }
 
-tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
-    exclude("**/pom.properties", "**/pom.xml")
+tasks.shadowJar {
     mergeServiceFiles()
     archiveFileName.set("${project.name}.jar")
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 application {
