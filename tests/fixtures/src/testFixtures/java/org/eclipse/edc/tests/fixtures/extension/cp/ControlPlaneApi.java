@@ -19,6 +19,8 @@ import io.restassured.http.ContentType;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.api.ThrowingConsumer;
 import org.eclipse.edc.connector.controlplane.test.system.utils.Participant;
+import org.eclipse.edc.junit.extensions.ComponentRuntimeContext;
+import org.eclipse.edc.junit.utils.LazySupplier;
 import org.eclipse.edc.spi.types.domain.DataAddress;
 
 import java.net.URI;
@@ -26,19 +28,22 @@ import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.awaitility.Awaitility.await;
-import static org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneExtension.API_KEY;
+import static org.eclipse.edc.web.spi.configuration.ApiContext.MANAGEMENT;
+import static org.eclipse.edc.web.spi.configuration.ApiContext.PROTOCOL;
 
 public class ControlPlaneApi extends Participant {
 
+    public static final String API_KEY = "password";
 
-    public URI getControlPlaneManagement() {
-        return controlPlaneManagement.get();
+    public static ControlPlaneApi forContext(ComponentRuntimeContext ctx) {
+        var id = ctx.getConfig().getString("edc.participant.id");
+        return ControlPlaneApi.Builder.newInstance()
+                .id(id)
+                .name("name")
+                .managementUrl(ctx.getEndpoint(MANAGEMENT))
+                .protocolUrl(ctx.getEndpoint(PROTOCOL))
+                .build();
     }
-
-    public URI getControlPlaneProtocol() {
-        return controlPlaneProtocol.get();
-    }
-
 
     public void waitForDataPlane() {
         await().atMost(timeout)
@@ -110,6 +115,16 @@ public class ControlPlaneApi extends Participant {
 
         public static Builder newInstance() {
             return new Builder();
+        }
+
+        public Builder managementUrl(LazySupplier<URI> managementUrl) {
+            participant.controlPlaneManagement = managementUrl;
+            return this;
+        }
+
+        public Builder protocolUrl(LazySupplier<URI> managementUrl) {
+            participant.controlPlaneProtocol = managementUrl;
+            return this;
         }
 
         @Override
