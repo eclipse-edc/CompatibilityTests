@@ -17,26 +17,23 @@ package org.eclipse.edc.dcp.tests.transfer;
 import jakarta.json.JsonObject;
 import org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures;
 import org.eclipse.edc.dcp.tests.extensions.DcpPatchExtension;
-import org.eclipse.edc.identityhub.tests.fixtures.common.Named;
+import org.eclipse.edc.identityhub.tests.fixtures.DefaultRuntimes;
+import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHub;
 import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHubApiClient;
-import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHubExtension;
-import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHubRuntime;
-import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerExtension;
-import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerRuntime;
+import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerService;
 import org.eclipse.edc.junit.annotations.EndToEndTest;
+import org.eclipse.edc.junit.annotations.Runtime;
+import org.eclipse.edc.junit.extensions.ComponentRuntimeContext;
+import org.eclipse.edc.junit.extensions.ComponentRuntimeExtension;
+import org.eclipse.edc.junit.extensions.RuntimeExtension;
+import org.eclipse.edc.junit.utils.Endpoints;
 import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.spi.system.ServiceExtension;
-import org.eclipse.edc.spi.system.configuration.Config;
 import org.eclipse.edc.spi.system.configuration.ConfigFactory;
 import org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndExtension;
 import org.eclipse.edc.tests.fixtures.Runtimes;
 import org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneApi;
-import org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneExtension;
-import org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneRuntime;
-import org.eclipse.edc.tests.fixtures.extension.dp.DataPlaneExtension;
-import org.eclipse.edc.tests.fixtures.extension.dp.DataPlaneRuntime;
 import org.eclipse.edc.tests.fixtures.transfer.HttpProxyDataPlaneExtension;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -51,18 +48,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures.noConstraintPolicy;
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.STARTED;
+import static org.eclipse.edc.dcp.tests.transfer.fixtures.TestFunction.httpSourceDataAddress;
 import static org.eclipse.edc.dcp.tests.transfer.fixtures.TestFunction.setupHolder;
 import static org.eclipse.edc.dcp.tests.transfer.fixtures.TestFunction.setupIssuer;
 import static org.eclipse.edc.dcp.tests.transfer.fixtures.TestFunction.setupParticipant;
 import static org.eclipse.edc.junit.testfixtures.TestUtils.getResourceFileContentAsString;
-import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
 
 @EndToEndTest
 public class DcpTransferEndToEndTest {
 
     public static final String CONSUMER_IH = "consumer_ih";
     public static final String CONSUMER_CP = "consumer-cp";
-    public static final String CONSUMER_DP = "consumer-dp";
     public static final String PROVIDER_IH = "provider_ih";
     public static final String CONSUMER_ID = "consumer";
     public static final String PROVIDER_ID = "provider";
@@ -72,14 +68,18 @@ public class DcpTransferEndToEndTest {
     @Order(0)
     @RegisterExtension
     static final PostgresqlEndToEndExtension POSTGRESQL_EXTENSION = new PostgresqlEndToEndExtension();
+
     @Order(2)
     @RegisterExtension
-    static final IssuerExtension ISSUER_EXTENSION = IssuerExtension.Builder.newInstance()
-            .id(Runtimes.Issuer.ID)
+    static final RuntimeExtension ISSUER_EXTENSION = ComponentRuntimeExtension.Builder.newInstance()
             .name(Runtimes.Issuer.ID)
             .modules(Runtimes.Issuer.MODULES)
+            .endpoints(DefaultRuntimes.Issuer.ENDPOINTS.build())
+            .configurationProvider(DefaultRuntimes.Issuer::config)
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(Runtimes.Issuer.ID))
+            .paramProvider(IssuerService.class, IssuerService::forContext)
             .build();
+
     @Order(1)
     @RegisterExtension
     static final BeforeAllCallback POSTGRES_CONTAINER_STARTER = context -> {
@@ -89,138 +89,122 @@ public class DcpTransferEndToEndTest {
         POSTGRESQL_EXTENSION.createDatabase(CONSUMER_ID);
         POSTGRESQL_EXTENSION.createDatabase(PROVIDER_ID);
     };
+
+    static final Endpoints CONSUMER_IH_ENDPOINTS = DefaultRuntimes.IdentityHub.ENDPOINTS.build();
+
     @Order(2)
     @RegisterExtension
-    static final IdentityHubExtension CONSUMER_IH_EXTENSION = IdentityHubExtension.Builder.newInstance()
-            .id("consumer-ih")
+    static final ComponentRuntimeExtension CONSUMER_IH_EXTENSION = ComponentRuntimeExtension.Builder.newInstance()
             .name(CONSUMER_IH)
             .modules(Runtimes.IdentityHub.MODULES)
+            .endpoints(CONSUMER_IH_ENDPOINTS)
+            .configurationProvider(DefaultRuntimes.IdentityHub::config)
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(CONSUMER_IH))
-            .build();
-    @Order(3)
-    @RegisterExtension
-    static final ControlPlaneExtension CONSUMER_CONTROL_PLANE_EXTENSION = ControlPlaneExtension.Builder.newInstance()
-            .id(CONSUMER_IH_EXTENSION.didFor(CONSUMER_ID))
-            .name(CONSUMER_CP)
-            .modules(Runtimes.ControlPlane.DCP_MODULES)
-            .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(CONSUMER_ID))
-            .configurationProvider(CONSUMER_IH_EXTENSION::stsConfig)
-            .configurationProvider(() -> dcpConfig(CONSUMER_IH_EXTENSION, CONSUMER_ID))
+            .configurationProvider(() -> ConfigFactory.fromMap(Map.of("edc.iam.credential.status.check.period", "0")))
+            .paramProvider(IdentityHub.class, IdentityHub::forContext)
+            .paramProvider(IdentityHubApiClient.class, IdentityHubApiClient::forContext)
             .build();
 
-    @Order(4)
+    @Order(3)
     @RegisterExtension
-    static final DataPlaneExtension CONSUMER_DATA_PLANE_EXTENSION = DataPlaneExtension.Builder.newInstance()
-            .id(CONSUMER_DP)
-            .name(CONSUMER_DP)
-            .modules(Runtimes.DataPlane.MODULES)
-            .configurationProvider(() -> dataPlaneSelectorFor(CONSUMER_CONTROL_PLANE_EXTENSION))
+    static final RuntimeExtension CONSUMER_CP_EXTENSION = ComponentRuntimeExtension.Builder.newInstance()
+            .name(CONSUMER_CP)
+            .modules(Runtimes.ControlPlane.DCP_MODULES)
+            .endpoints(Runtimes.ControlPlane.ENDPOINTS.build())
+            .configurationProvider(() -> Runtimes.IdentityHub.dcpConfig(CONSUMER_IH_ENDPOINTS, CONSUMER_ID))
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(CONSUMER_ID))
-            .build();
+            .paramProvider(ControlPlaneApi.class, ControlPlaneApi::forContext)
+            .build()
+            .registerSystemExtension(ServiceExtension.class, new DcpPatchExtension());
+
+    static final Endpoints PROVIDER_IH_ENDPOINTS = DefaultRuntimes.IdentityHub.ENDPOINTS.build();
 
     @Order(2)
     @RegisterExtension
-    static final IdentityHubExtension PROVIDER_IH_EXTENSION = IdentityHubExtension.Builder.newInstance()
-            .id("provider-ih")
+    static final RuntimeExtension PROVIDER_IH_EXTENSION = ComponentRuntimeExtension.Builder.newInstance()
             .name(PROVIDER_IH)
             .modules(Runtimes.IdentityHub.MODULES)
+            .endpoints(PROVIDER_IH_ENDPOINTS)
+            .configurationProvider(DefaultRuntimes.IdentityHub::config)
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(PROVIDER_IH))
+            .configurationProvider(() -> ConfigFactory.fromMap(Map.of("edc.iam.credential.status.check.period", "0")))
+            .paramProvider(IdentityHub.class, IdentityHub::forContext)
+            .paramProvider(IdentityHubApiClient.class, IdentityHubApiClient::forContext)
             .build();
+
+    static final Endpoints PROVIDER_CP_ENDPOINTS = Runtimes.ControlPlane.ENDPOINTS.build();
 
     @Order(3)
     @RegisterExtension
-    static final ControlPlaneExtension PROVIDER_CONTROL_PLANE_EXTENSION = ControlPlaneExtension.Builder.newInstance()
-            .id(PROVIDER_IH_EXTENSION.didFor(PROVIDER_ID))
+    static final RuntimeExtension PROVIDER_CP_EXTENSION = ComponentRuntimeExtension.Builder.newInstance()
             .name(PROVIDER_CP)
             .modules(Runtimes.ControlPlane.DCP_MODULES)
+            .endpoints(PROVIDER_CP_ENDPOINTS)
+            .configurationProvider(() -> Runtimes.IdentityHub.dcpConfig(PROVIDER_IH_ENDPOINTS, PROVIDER_ID))
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(PROVIDER_ID))
-            .configurationProvider(PROVIDER_IH_EXTENSION::stsConfig)
-            .configurationProvider(() -> dcpConfig(PROVIDER_IH_EXTENSION, PROVIDER_ID))
-            .build();
+            .paramProvider(ControlPlaneApi.class, ControlPlaneApi::forContext)
+            .build()
+            .registerSystemExtension(ServiceExtension.class, new DcpPatchExtension());
+
 
     @Order(4)
     @RegisterExtension
-    static final DataPlaneExtension PROVIDER_DATA_PLANE_EXTENSION = DataPlaneExtension.Builder.newInstance()
-            .id(PROVIDER_DP)
+    static final RuntimeExtension PROVIDER_DP_EXTENSION = ComponentRuntimeExtension.Builder.newInstance()
             .name(PROVIDER_DP)
             .modules(Runtimes.DataPlane.MODULES)
-            .configurationProvider(() -> dataPlaneSelectorFor(PROVIDER_CONTROL_PLANE_EXTENSION))
+            .endpoints(Runtimes.DataPlane.ENDPOINTS.build())
+            .configurationProvider(Runtimes.DataPlane::config)
+            .configurationProvider(() -> Runtimes.ControlPlane.dataPlaneSelectorFor(PROVIDER_CP_ENDPOINTS))
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(PROVIDER_ID))
-            .build();
-
-    protected static String privateKey = getResourceFileContentAsString("certs/key.pem");
-    protected static String publicKey = getResourceFileContentAsString("certs/cert.pem");
-
-    static {
-        PROVIDER_CONTROL_PLANE_EXTENSION.registerSystemExtension(ServiceExtension.class, new DcpPatchExtension());
-        PROVIDER_DATA_PLANE_EXTENSION.registerSystemExtension(ServiceExtension.class, new HttpProxyDataPlaneExtension());
-        CONSUMER_CONTROL_PLANE_EXTENSION.registerSystemExtension(ServiceExtension.class, new DcpPatchExtension());
-    }
-
-    private static @NotNull Map<String, Object> httpSourceDataAddress() {
-        return Map.of(
-                EDC_NAMESPACE + "name", "transfer-test",
-                EDC_NAMESPACE + "baseUrl", "http://anysource.com",
-                EDC_NAMESPACE + "type", "HttpData",
-                EDC_NAMESPACE + "proxyQueryParams", "true"
-        );
-    }
+            .build()
+            .registerSystemExtension(ServiceExtension.class, new HttpProxyDataPlaneExtension());
 
     /**
      * Set up the test environment by creating one issuer, two participants in their
      * respective Identity Hubs, and issuing a MembershipCredential credential for each participant.
      */
     @BeforeAll
-    static void setup(IssuerRuntime issuerRuntime,
-                      @Named(CONSUMER_IH) IdentityHubRuntime consumerRuntime,
-                      @Named(PROVIDER_IH) IdentityHubRuntime providerRuntime,
-                      @Named(CONSUMER_IH) IdentityHubApiClient consumerApiClient,
-                      @Named(PROVIDER_IH) IdentityHubApiClient providerApiClient,
-                      @Named(CONSUMER_CP) ControlPlaneRuntime consumerControlPlane,
-                      @Named(PROVIDER_CP) ControlPlaneRuntime providerControlPlane,
-                      @Named(PROVIDER_DP) DataPlaneRuntime providerDataPlane) {
+    static void setup(IssuerService issuer,
+                      @Runtime(CONSUMER_IH) IdentityHub consumerIdentityHub,
+                      @Runtime(PROVIDER_IH) IdentityHub providerIdentityHub,
+                      @Runtime(CONSUMER_IH) IdentityHubApiClient consumerApiClient,
+                      @Runtime(PROVIDER_IH) IdentityHubApiClient providerApiClient,
+                      @Runtime(CONSUMER_CP) ComponentRuntimeContext consumerCtx,
+                      @Runtime(PROVIDER_CP) ComponentRuntimeContext providerCtx,
+                      @Runtime(PROVIDER_DP) Vault dpVault) {
 
-        var vault = providerDataPlane.getService(Vault.class);
-        vault.storeSecret("private-key", privateKey);
-        vault.storeSecret("public-key", publicKey);
+        var privateKey = getResourceFileContentAsString("certs/key.pem");
+        var publicKey = getResourceFileContentAsString("certs/cert.pem");
 
-        var issuerDid = issuerRuntime.didFor(Runtimes.Issuer.ID);
 
-        setupIssuer(issuerRuntime, Runtimes.Issuer.ID, issuerDid);
+        var consumerHolderDid = consumerIdentityHub.didFor(CONSUMER_ID);
+        var providerHolderDid = providerIdentityHub.didFor(PROVIDER_ID);
+        dpVault.storeSecret("private-key", privateKey);
+        dpVault.storeSecret("public-key", publicKey);
 
-        setupHolder(issuerRuntime, Runtimes.Issuer.ID, providerControlPlane);
-        setupHolder(issuerRuntime, Runtimes.Issuer.ID, consumerControlPlane);
 
-        var providerResponse = setupParticipant(providerRuntime, providerControlPlane);
-        var consumerResponse = setupParticipant(consumerRuntime, consumerControlPlane);
+        var issuerDid = issuer.didFor(Runtimes.Issuer.ID);
 
-        var providerPid = providerApiClient.requestCredential(providerResponse.apiKey(), providerControlPlane.getId(), issuerDid, "credential-id", "MembershipCredential");
-        var consumerPid = consumerApiClient.requestCredential(consumerResponse.apiKey(), consumerControlPlane.getId(), issuerDid, "credential-id", "MembershipCredential");
+        setupIssuer(issuer, Runtimes.Issuer.ID, issuerDid);
 
-        providerRuntime.waitForCredentialIssuer(providerPid, providerControlPlane.getId());
-        consumerRuntime.waitForCredentialIssuer(consumerPid, consumerControlPlane.getId());
+        setupHolder(issuer, Runtimes.Issuer.ID, consumerHolderDid);
+        setupHolder(issuer, Runtimes.Issuer.ID, providerHolderDid);
 
-    }
+        var providerResponse = setupParticipant(providerIdentityHub, providerCtx, issuerDid, providerHolderDid);
+        var consumerResponse = setupParticipant(consumerIdentityHub, consumerCtx, issuerDid, consumerHolderDid);
 
-    private static Config dcpConfig(IdentityHubExtension extension, String id) {
-        var did = extension.didFor(id);
-        return ConfigFactory.fromMap(Map.of(
-                "edc.iam.issuer.id", did,
-                "edc.iam.sts.oauth.client.id", did,
-                "edc.iam.sts.oauth.client.secret.alias", did + "-alias",
-                "edc.iam.did.web.use.https", "false"
-        ));
-    }
 
-    private static Config dataPlaneSelectorFor(ControlPlaneExtension extension) {
-        return ConfigFactory.fromMap(Map.of(
-                "edc.dpf.selector.url", extension.getControlPlaneControl().getUrl() + "/v1/dataplanes"
-        ));
+        var providerPid = providerApiClient.requestCredential(providerResponse.apiKey(), providerHolderDid, issuerDid, "credential-id", "MembershipCredential");
+        var consumerPid = consumerApiClient.requestCredential(consumerResponse.apiKey(), consumerHolderDid, issuerDid, "credential-id", "MembershipCredential");
+
+        providerIdentityHub.waitForCredentialIssuer(providerPid, providerHolderDid);
+        consumerIdentityHub.waitForCredentialIssuer(consumerPid, consumerHolderDid);
+
     }
 
     @Test
-    void httpPullTransfer(@Named(CONSUMER_CP) ControlPlaneApi consumer,
-                          @Named(PROVIDER_CP) ControlPlaneApi provider) {
+    void httpPullTransfer(@Runtime(CONSUMER_CP) ControlPlaneApi consumer,
+                          @Runtime(PROVIDER_CP) ControlPlaneApi provider) {
 
         provider.waitForDataPlane();
 

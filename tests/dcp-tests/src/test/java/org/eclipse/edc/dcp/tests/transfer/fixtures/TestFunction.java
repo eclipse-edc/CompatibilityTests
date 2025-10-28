@@ -21,35 +21,31 @@ import org.eclipse.edc.iam.verifiablecredentials.spi.model.RevocationServiceRegi
 import org.eclipse.edc.iam.verifiablecredentials.spi.model.VerifiableCredential;
 import org.eclipse.edc.iam.verifiablecredentials.spi.validation.TrustedIssuerRegistry;
 import org.eclipse.edc.identityhub.spi.participantcontext.model.CreateParticipantContextResponse;
-import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHubRuntime;
-import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerRuntime;
-import org.eclipse.edc.issuerservice.spi.issuance.attestation.AttestationDefinitionService;
-import org.eclipse.edc.issuerservice.spi.issuance.credentialdefinition.CredentialDefinitionService;
+import org.eclipse.edc.identityhub.tests.fixtures.credentialservice.IdentityHub;
+import org.eclipse.edc.identityhub.tests.fixtures.issuerservice.IssuerService;
 import org.eclipse.edc.issuerservice.spi.issuance.model.AttestationDefinition;
 import org.eclipse.edc.issuerservice.spi.issuance.model.CredentialDefinition;
 import org.eclipse.edc.issuerservice.spi.issuance.model.CredentialRuleDefinition;
 import org.eclipse.edc.issuerservice.spi.issuance.model.MappingDefinition;
+import org.eclipse.edc.junit.extensions.ComponentRuntimeContext;
 import org.eclipse.edc.spi.result.Result;
 import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.sql.QueryExecutor;
-import org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneRuntime;
 import org.eclipse.edc.transaction.datasource.spi.DataSourceRegistry;
 import org.eclipse.edc.transaction.spi.TransactionContext;
+import org.jetbrains.annotations.NotNull;
 
 import java.sql.SQLException;
 import java.util.Map;
 
 import static org.eclipse.edc.iam.verifiablecredentials.spi.model.CredentialFormat.VC1_0_JWT;
+import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
 
 public class TestFunction {
 
 
-    public static void setupIssuer(IssuerRuntime issuerRuntime, String participantContextId, String did) {
-        issuerRuntime.createParticipant(participantContextId, did, did + "#key");
-        var attestationDefinitionService = issuerRuntime.getService(AttestationDefinitionService.class);
-        var credentialDefinitionService = issuerRuntime.getService(CredentialDefinitionService.class);
-        var dataSourceRegistry = issuerRuntime.getService(DataSourceRegistry.class);
-        var executor = issuerRuntime.getService(QueryExecutor.class);
+    public static void setupIssuer(IssuerService issuerService, String participantContextId, String did) {
+        issuerService.createParticipant(participantContextId, did, did + "#key");
 
         var attestationDefinition = AttestationDefinition.Builder.newInstance().id("attestation-id")
                 .attestationType("database")
@@ -60,9 +56,7 @@ public class TestFunction {
                         "idColumn", "holderId"))
                 .build();
 
-        attestationDefinitionService.createAttestation(attestationDefinition)
-                .orElseThrow(f -> new RuntimeException(f.getFailureDetail()));
-
+        issuerService.createAttestationDefinition(attestationDefinition);
 
         Map<String, Object> ruleConfiguration = Map.of(
                 "claim", "member_signed_document",
@@ -83,12 +77,12 @@ public class TestFunction {
                 .formatFrom(VC1_0_JWT)
                 .build();
 
-        credentialDefinitionService.createCredentialDefinition(credentialDefinition)
-                .orElseThrow(f -> new RuntimeException(f.getFailureDetail()));
+        issuerService.createCredentialDefinition(credentialDefinition);
 
-
+        var dataSourceRegistry = issuerService.getService(DataSourceRegistry.class);
+        var tx = issuerService.getService(TransactionContext.class);
+        var executor = issuerService.getService(QueryExecutor.class);
         var dataSource = dataSourceRegistry.resolve("default");
-        var tx = issuerRuntime.getService(TransactionContext.class);
 
         tx.execute(() -> {
             try (var connection = dataSource.getConnection()) {
@@ -100,38 +94,34 @@ public class TestFunction {
 
     }
 
-    public static void setupHolder(IssuerRuntime issuerRuntime, String participantContextId, ControlPlaneRuntime controlPlaneRuntime) {
+    public static void setupHolder(IssuerService issuerService, String participantContextId, String holderId) {
 
-        issuerRuntime.createHolder(participantContextId, controlPlaneRuntime.getId(), controlPlaneRuntime.getId(), controlPlaneRuntime.getName());
-
-        var dataSourceRegistry = issuerRuntime.getService(DataSourceRegistry.class);
-        var tx = issuerRuntime.getService(TransactionContext.class);
-        var executor = issuerRuntime.getService(QueryExecutor.class);
+        issuerService.createHolder(participantContextId, holderId, holderId, holderId);
 
 
-        controlPlaneRuntime.getService(TrustedIssuerRegistry.class).register(new Issuer(issuerRuntime.didFor(participantContextId), Map.of()), "*");
+        var dataSourceRegistry = issuerService.getService(DataSourceRegistry.class);
+        var tx = issuerService.getService(TransactionContext.class);
+        var executor = issuerService.getService(QueryExecutor.class);
 
         tx.execute(() -> {
             var dataSource = dataSourceRegistry.resolve("default");
 
             try (var connection = dataSource.getConnection()) {
-                executor.execute(connection, "INSERT INTO attestations (holderId, member_name, membership_start_date, member_signed_document) VALUES (?, ?, now(), true)", controlPlaneRuntime.getId(), controlPlaneRuntime.getName());
+                executor.execute(connection, "INSERT INTO attestations (holderId, member_name, membership_start_date, member_signed_document) VALUES (?, ?, now(), true)", holderId, holderId);
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
         });
-
     }
+    
+    public static CreateParticipantContextResponse setupParticipant(IdentityHub identityHub, ComponentRuntimeContext ctx, String issuerDid, String holderId) {
 
+        var response = identityHub.createParticipant(holderId, holderId, holderId + "#key");
 
-    public static CreateParticipantContextResponse setupParticipant(IdentityHubRuntime identityHubRuntime, ControlPlaneRuntime controlPlaneRuntime) {
-        var participantId = controlPlaneRuntime.getId();
-        var response = identityHubRuntime.createParticipant(participantId, participantId, participantId + "#key");
+        var vault = ctx.getService(Vault.class);
+        vault.storeSecret(holderId + "-alias", response.clientSecret());
 
-        var vault = controlPlaneRuntime.getService(Vault.class);
-        vault.storeSecret(participantId + "-alias", response.clientSecret());
-
-        var revocationRegistry = controlPlaneRuntime.getService(RevocationServiceRegistry.class);
+        var revocationRegistry = ctx.getService(RevocationServiceRegistry.class);
 
         revocationRegistry.addService("BitstringStatusListEntry", new RevocationListService() {
             @Override
@@ -144,6 +134,19 @@ public class TestFunction {
                 return null;
             }
         });
+
+        ctx.getService(TrustedIssuerRegistry.class).register(new Issuer(issuerDid, Map.of()), "*");
+
+
         return response;
+    }
+
+    public static @NotNull Map<String, Object> httpSourceDataAddress() {
+        return Map.of(
+                EDC_NAMESPACE + "name", "transfer-test",
+                EDC_NAMESPACE + "baseUrl", "http://anysource.com",
+                EDC_NAMESPACE + "type", "HttpData",
+                EDC_NAMESPACE + "proxyQueryParams", "true"
+        );
     }
 }

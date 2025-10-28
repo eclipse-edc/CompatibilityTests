@@ -15,25 +15,21 @@
 package org.eclipse.edc.compatibility.tests.transfer;
 
 import jakarta.json.JsonObject;
-import org.eclipse.edc.compatibility.tests.fixtures.DockerParticipant;
 import org.eclipse.edc.compatibility.tests.fixtures.DockerRuntimeExtension;
-import org.eclipse.edc.compatibility.tests.fixtures.EdcDockerRuntimes;
+import org.eclipse.edc.compatibility.tests.fixtures.DockerRuntimes;
 import org.eclipse.edc.connector.controlplane.test.system.utils.PolicyFixtures;
 import org.eclipse.edc.junit.annotations.EndToEndTest;
+import org.eclipse.edc.junit.annotations.Runtime;
+import org.eclipse.edc.junit.extensions.ComponentRuntimeExtension;
 import org.eclipse.edc.junit.extensions.RuntimeExtension;
+import org.eclipse.edc.junit.utils.Endpoints;
 import org.eclipse.edc.spi.security.Vault;
 import org.eclipse.edc.spi.system.ServiceExtension;
-import org.eclipse.edc.spi.system.configuration.Config;
-import org.eclipse.edc.spi.system.configuration.ConfigFactory;
 import org.eclipse.edc.sql.testfixtures.PostgresqlEndToEndExtension;
 import org.eclipse.edc.tests.fixtures.Runtimes;
 import org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneApi;
-import org.eclipse.edc.tests.fixtures.extension.cp.ControlPlaneExtension;
-import org.eclipse.edc.tests.fixtures.extension.dp.DataPlaneExtension;
 import org.eclipse.edc.tests.fixtures.transfer.HttpProxyDataPlaneExtension;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -43,9 +39,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
-import org.mockserver.integration.ClientAndServer;
-import org.mockserver.model.HttpRequest;
-import org.mockserver.model.HttpResponse;
 
 import java.util.Map;
 import java.util.Objects;
@@ -62,8 +55,7 @@ import static org.eclipse.edc.connector.controlplane.transfer.spi.types.Transfer
 import static org.eclipse.edc.connector.controlplane.transfer.spi.types.TransferProcessStates.SUSPENDED;
 import static org.eclipse.edc.junit.testfixtures.TestUtils.getResourceFileContentAsString;
 import static org.eclipse.edc.spi.constants.CoreConstants.EDC_NAMESPACE;
-import static org.eclipse.edc.util.io.Ports.getFreePort;
-import static org.mockserver.integration.ClientAndServer.startClientAndServer;
+import static org.eclipse.edc.tests.fixtures.Runtimes.ControlPlane.dataPlaneSelectorFor;
 
 
 @EndToEndTest
@@ -71,44 +63,52 @@ public class TransferEndToEndTest {
 
     public static final String REMOTE = "remote";
     public static final String LOCAL = "local";
-    protected static final DockerParticipant REMOTE_PARTICIPANT = DockerParticipant.Builder.newInstance()
-            .name(REMOTE)
-            .id(REMOTE)
-            .build();
-    @Order(3)
-    @RegisterExtension
-    static final DockerRuntimeExtension DATA_PLANE_T = EdcDockerRuntimes.DATA_PLANE.create("dataplane")
-            .envProvider(REMOTE_PARTICIPANT::dataPlaneEnv)
-            .envProvider(pgEnv(REMOTE));
-    @Order(2)
-    @RegisterExtension
-    static final DockerRuntimeExtension CONTROL_PLANE_T = EdcDockerRuntimes.CONTROL_PLANE.create("controlplane")
-            .envProvider(REMOTE_PARTICIPANT::controlPlaneEnv)
-            .envProvider(pgEnv(REMOTE));
+    public static final String LOCAL_CP = "local-controlplane";
+    public static final String LOCAL_DP = "local-dataplane";
+    public static final String REMOTE_CP = "remote-controlplane";
+    static final Endpoints LOCAL_CP_ENDPOINTS = Runtimes.ControlPlane.ENDPOINTS.build();
+    static final Endpoints REMOTE_CP_ENDPOINTS = DockerRuntimes.ControlPlane.ENDPOINTS.build();
+
     @Order(0)
     @RegisterExtension
     static final PostgresqlEndToEndExtension POSTGRESQL_EXTENSION = new PostgresqlEndToEndExtension();
+
     @Order(2)
     @RegisterExtension
-    static final ControlPlaneExtension LOCAL_CONTROL_PLANE = ControlPlaneExtension.Builder.newInstance()
-            .id("local-controlplane")
-            .name("local-controlplane")
-            .modules(Runtimes.ControlPlane.MODULES)
-            .shouldInjectControlPlaneApi(false)
-            .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(LOCAL))
-            .build();
+    static final DockerRuntimeExtension CONTROL_PLANE_T = DockerRuntimes.ControlPlane.create(REMOTE_CP)
+            .endpoints(REMOTE_CP_ENDPOINTS)
+            .envProvider(() -> DockerRuntimes.ControlPlane.env(REMOTE))
+            .envProvider(pgEnv(REMOTE))
+            .paramProvider(ControlPlaneApi.class, DockerRuntimes.ControlPlane::controlPlaneApi);
 
     @Order(3)
     @RegisterExtension
-    static final RuntimeExtension LOCAL_DATA_PLANE = DataPlaneExtension.Builder.newInstance()
-            .id("local-dataplane")
-            .name("local-dataplane")
+    static final DockerRuntimeExtension DATA_PLANE_T = DockerRuntimes.DataPlane.create("dataplane")
+            .endpoints(DockerRuntimes.DataPlane.ENDPOINTS.build())
+            .envProvider(() -> DockerRuntimes.ControlPlane.dataPlaneSelectorFor(REMOTE_CP_ENDPOINTS))
+            .envProvider(DockerRuntimes.DataPlane::env)
+            .envProvider(pgEnv(REMOTE));
+    @Order(2)
+    @RegisterExtension
+    static final RuntimeExtension LOCAL_CONTROL_PLANE = ComponentRuntimeExtension.Builder.newInstance()
+            .name(LOCAL_CP)
+            .modules(Runtimes.ControlPlane.MODULES)
+            .endpoints(LOCAL_CP_ENDPOINTS)
+            .configurationProvider(() -> Runtimes.ControlPlane.config(LOCAL_CP))
+            .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(LOCAL))
+            .paramProvider(ControlPlaneApi.class, ControlPlaneApi::forContext)
+            .build();
+    @Order(3)
+    @RegisterExtension
+    static final RuntimeExtension LOCAL_DATA_PLANE = ComponentRuntimeExtension.Builder.newInstance()
+            .name(LOCAL_DP)
             .modules(Runtimes.DataPlane.MODULES)
-            .configurationProvider(() -> dataPlaneSelectorFor(LOCAL_CONTROL_PLANE))
+            .endpoints(Runtimes.DataPlane.ENDPOINTS.build())
+            .configurationProvider(Runtimes.DataPlane::config)
+            .configurationProvider(() -> dataPlaneSelectorFor(LOCAL_CP_ENDPOINTS))
             .configurationProvider(() -> POSTGRESQL_EXTENSION.configFor(LOCAL))
             .build()
             .registerSystemExtension(ServiceExtension.class, new HttpProxyDataPlaneExtension());
-
 
     @Order(1)
     @RegisterExtension
@@ -117,9 +117,6 @@ public class TransferEndToEndTest {
         POSTGRESQL_EXTENSION.createDatabase(REMOTE);
     };
 
-    protected static String privateKey = getResourceFileContentAsString("certs/key.pem");
-    protected static String publicKey = getResourceFileContentAsString("certs/cert.pem");
-    private static ClientAndServer providerDataSource;
 
     static Supplier<Map<String, String>> pgEnv(String databaseName) {
         return () -> {
@@ -133,45 +130,40 @@ public class TransferEndToEndTest {
         return cfg.toUpperCase().replace('.', '_');
     }
 
-    @BeforeAll
-    static void beforeAll() {
-        providerDataSource = startClientAndServer(getFreePort());
-    }
 
     private static @NotNull Map<String, Object> httpSourceDataAddress() {
         return Map.of(
                 EDC_NAMESPACE + "name", "transfer-test",
-                EDC_NAMESPACE + "baseUrl", "http://localhost:" + providerDataSource.getPort() + "/source",
+                EDC_NAMESPACE + "baseUrl", "http://localhost",
                 EDC_NAMESPACE + "type", "HttpData",
                 EDC_NAMESPACE + "proxyQueryParams", "true"
         );
     }
 
-    private static Config dataPlaneSelectorFor(ControlPlaneExtension extension) {
-        return ConfigFactory.fromMap(Map.of(
-                "edc.dpf.selector.url", extension.getControlPlaneControl().getUrl() + "/v1/dataplanes"
-        ));
-    }
-
-    @AfterEach
-    void afterEach() {
-        providerDataSource.reset();
-    }
-
     @BeforeEach
-    void storeKeys() {
-        var vault = LOCAL_DATA_PLANE.getService(Vault.class);
+    void storeKeys(@Runtime(LOCAL_DP) Vault vault) {
+        var privateKey = getResourceFileContentAsString("certs/key.pem");
+        var publicKey = getResourceFileContentAsString("certs/cert.pem");
         vault.storeSecret("private-key", privateKey);
         vault.storeSecret("public-key", publicKey);
     }
 
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
-    void httpPullTransfer(ControlPlaneApi consumer, ControlPlaneApi provider, String protocol, String path, boolean hasProxySupport) {
+    void httpPullTransfer_whenConsumerRemote(String protocol, String path, @Runtime(LOCAL_CP) ControlPlaneApi local, @Runtime(REMOTE_CP) ControlPlaneApi remote) {
+        httpPullTransfer(protocol, path, remote, local);
+    }
+
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void httpPullTransfer_whenConsumerLocal(String protocol, String path, @Runtime(LOCAL_CP) ControlPlaneApi local, @Runtime(REMOTE_CP) ControlPlaneApi remote) {
+        httpPullTransfer(protocol, path, local, remote);
+    }
+
+    private void httpPullTransfer(String protocol, String path, ControlPlaneApi consumer, ControlPlaneApi provider) {
         consumer.setProtocol(protocol, path);
         provider.setProtocol(protocol, path);
         provider.waitForDataPlane();
-        providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
         var assetId = UUID.randomUUID().toString();
         var sourceDataAddress = httpSourceDataAddress();
         createResourcesOnProvider(provider, assetId, PolicyFixtures.contractExpiresIn("5s"), sourceDataAddress);
@@ -199,19 +191,24 @@ public class TransferEndToEndTest {
                 .untilAsserted(() -> assertThatThrownBy(() -> consumer.pullData(edr, Map.of("message", msg), body -> assertThat(body).isEqualTo("data"))));
 
 
-        if (hasProxySupport) {
-            providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
-        }
-
     }
 
     @ParameterizedTest
     @ArgumentsSource(ParticipantsArgProvider.class)
-    void suspendAndResume_httpPull_dataTransfer(ControlPlaneApi consumer, ControlPlaneApi provider, String protocol, String path, boolean hasProxySupport) {
+    void httpPullTransfer_suspendAndResume_whenConsumerLocal(String protocol, String path, @Runtime(LOCAL_CP) ControlPlaneApi local, @Runtime(REMOTE_CP) ControlPlaneApi remote) {
+        httpPullTransfer_suspendAndResume(protocol, path, local, remote);
+    }
+
+    @ParameterizedTest
+    @ArgumentsSource(ParticipantsArgProvider.class)
+    void httpPullTransfer_suspendAndResume_whenConsumerRemote(String protocol, String path, @Runtime(LOCAL_CP) ControlPlaneApi local, @Runtime(REMOTE_CP) ControlPlaneApi remote) {
+        httpPullTransfer_suspendAndResume(protocol, path, remote, local);
+    }
+
+    private void httpPullTransfer_suspendAndResume(String protocol, String path, ControlPlaneApi consumer, ControlPlaneApi provider) {
         consumer.setProtocol(protocol, path);
         provider.setProtocol(protocol, path);
         provider.waitForDataPlane();
-        providerDataSource.when(HttpRequest.request()).respond(HttpResponse.response().withBody("data"));
         var assetId = UUID.randomUUID().toString();
         createResourcesOnProvider(provider, assetId, PolicyFixtures.noConstraintPolicy(), httpSourceDataAddress());
 
@@ -242,10 +239,6 @@ public class TransferEndToEndTest {
         var secondEdr = await().atMost(consumer.getTimeout()).until(() -> consumer.getEdr(transferProcessId), Objects::nonNull);
         var secondMessage = UUID.randomUUID().toString();
         await().atMost(consumer.getTimeout()).untilAsserted(() -> consumer.pullData(secondEdr, Map.of("message", secondMessage), body -> assertThat(body).isEqualTo("data")));
-
-        if (hasProxySupport) {
-            providerDataSource.verify(HttpRequest.request("/source").withMethod("GET"));
-        }
     }
 
     protected void createResourcesOnProvider(ControlPlaneApi provider, String assetId, JsonObject contractPolicy, Map<String, Object> dataAddressProperties) {
@@ -259,14 +252,9 @@ public class TransferEndToEndTest {
     private static class ParticipantsArgProvider implements ArgumentsProvider {
         @Override
         public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
-
-            var localParticipant = LOCAL_CONTROL_PLANE.getControlPlaneApi();
-            var remoteParticipant = REMOTE_PARTICIPANT.getControlPlaneApi();
             return Stream.of(
-                    Arguments.of(remoteParticipant, localParticipant, "dataspace-protocol-http", "", false),
-                    Arguments.of(localParticipant, remoteParticipant, "dataspace-protocol-http", "", false),
-                    Arguments.of(remoteParticipant, localParticipant, "dataspace-protocol-http:2024/1", "/2024/1", false),
-                    Arguments.of(localParticipant, remoteParticipant, "dataspace-protocol-http:2024/1", "/2024/1", false)
+                    Arguments.of("dataspace-protocol-http", ""),
+                    Arguments.of("dataspace-protocol-http:2024/1", "/2024/1")
             );
         }
     }
