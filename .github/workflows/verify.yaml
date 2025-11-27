@@ -84,7 +84,7 @@ jobs:
         run: ./gradlew dockerize
 
       - name: Run Compatibility tests
-        run: ./gradlew test -DincludeTags="EndToEndTest"
+        run: ./gradlew test -DincludeTags="EndToEndTest" -PverboseTest=true
 
 
   post-to-discord:
