@@ -84,7 +84,7 @@ jobs:
         run: ./gradlew dockerize
 
       - name: Run Compatibility tests
-        run:
+        run: |
           ./gradlew shadowJar
           ./gradlew test -DincludeTags="EndToEndTest" -PverboseTest=true
 
