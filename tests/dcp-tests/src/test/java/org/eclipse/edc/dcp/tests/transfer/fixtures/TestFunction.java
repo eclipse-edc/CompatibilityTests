@@ -113,13 +113,13 @@ public class TestFunction {
             }
         });
     }
-    
+
     public static CreateParticipantContextResponse setupParticipant(IdentityHub identityHub, ComponentRuntimeContext ctx, String issuerDid, String holderId) {
 
         var response = identityHub.createParticipant(holderId, holderId, holderId + "#key");
 
         var vault = ctx.getService(Vault.class);
-        vault.storeSecret(holderId + "-alias", response.clientSecret());
+        vault.storeSecret(holderId, holderId + "-alias", response.clientSecret());
 
         var revocationRegistry = ctx.getService(RevocationServiceRegistry.class);
 
